@@ -11,23 +11,38 @@ final class SeedDataService {
         self.modelContext = modelContext
     }
 
-    /// Seeds the database if no foods exist. Tries Matvaretabellen API first, falls back to local JSON.
+    private static let seedCompletedKey = "com.foodlogger.seedCompleted"
+
+    /// Whether the initial seed has already been performed (persists across launches).
+    private var hasSeeded: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.seedCompletedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.seedCompletedKey) }
+    }
+
+    /// Seeds the database on first launch only. Once seeded, never re-seeds even if foods are deleted.
     func seedIfNeeded() async {
+        guard !hasSeeded else {
+            logger.info("Seed already completed previously, skipping")
+            return
+        }
+
         var descriptor = FetchDescriptor<FoodItem>()
         descriptor.fetchLimit = 1
         let existingCount = (try? modelContext.fetchCount(descriptor)) ?? 0
 
         guard existingCount == 0 else {
-            logger.info("Database already has foods, skipping seed")
+            logger.info("Database already has foods, marking seed as complete")
+            hasSeeded = true
             return
         }
 
-        logger.info("No foods in database, starting seed...")
+        logger.info("First launch with no foods, starting seed...")
 
         // Try API first
         do {
             let count = try await seedFromMatvaretabellen()
             logger.info("Seeded \(count) foods from Matvaretabellen API")
+            hasSeeded = true
             return
         } catch {
             logger.warning("Matvaretabellen API failed: \(error.localizedDescription). Falling back to local JSON.")
@@ -37,6 +52,7 @@ final class SeedDataService {
         do {
             let count = try seedFromLocalJSON()
             logger.info("Seeded \(count) foods from local JSON")
+            hasSeeded = true
         } catch {
             logger.error("Local JSON seed also failed: \(error.localizedDescription)")
         }
