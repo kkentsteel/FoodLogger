@@ -92,6 +92,15 @@ struct ProfileView: View {
                     }
 
                     Section {
+                        LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                        LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
+                    } header: {
+                        Text("About")
+                    } footer: {
+                        Text("FoodLogger — AI-powered nutrition tracking. Food data from Matvaretabellen (matvaretabellen.no) and Open Food Facts.")
+                    }
+
+                    Section {
                         Button(role: .destructive) {
                             showDeleteFoodsConfirmation = true
                         } label: {

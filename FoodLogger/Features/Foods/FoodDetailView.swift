@@ -7,9 +7,25 @@ struct FoodDetailView: View {
 
     @Bindable var food: FoodItem
     @State private var showDeleteAlert = false
+    @State private var showLogSheet = false
+    @State private var logQuantity: Double = 1.0
+    @State private var showLogSuccess = false
+
+    @Query(sort: \MealSlot.sortOrder) private var mealSlots: [MealSlot]
 
     var body: some View {
         List {
+            // Quick log section at top
+            Section {
+                Button {
+                    showLogSheet = true
+                } label: {
+                    Label("Log This Food", systemImage: "plus.circle.fill")
+                        .fontWeight(.medium)
+                }
+                .tint(.green)
+            }
+
             Section {
                 LabeledContent("Name", value: food.name)
                 if let brand = food.brand, !brand.isEmpty {
@@ -155,6 +171,99 @@ struct FoodDetailView: View {
                 Text("This action cannot be undone.")
             }
         }
+        .sheet(isPresented: $showLogSheet) {
+            logFoodSheet
+        }
+        .overlay {
+            if showLogSuccess {
+                VStack {
+                    Spacer()
+                    Text("Logged!")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.green, in: Capsule())
+                        .foregroundStyle(.white)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    Spacer().frame(height: 20)
+                }
+                .animation(.easeInOut, value: showLogSuccess)
+            }
+        }
+    }
+
+    private var logFoodSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Text(food.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+
+                Stepper(value: $logQuantity, in: 0.25...20, step: 0.25) {
+                    Text("\(logQuantity.formattedOneDecimal) servings")
+                        .font(.headline)
+                }
+                .padding(.horizontal)
+
+                VStack(spacing: 4) {
+                    Text("\(Int(food.caloriesPerServing * logQuantity)) kcal")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    HStack(spacing: 16) {
+                        Text("P: \((food.proteinPerServing * logQuantity).formattedGrams)")
+                        Text("C: \((food.carbsPerServing * logQuantity).formattedGrams)")
+                        Text("F: \((food.fatPerServing * logQuantity).formattedGrams)")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Log Food")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showLogSheet = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Log") {
+                        logFoodToToday()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func logFoodToToday() {
+        guard let firstSlot = mealSlots.first else { return }
+        let dbService = FoodDatabaseService(modelContext: modelContext)
+        guard let dailyLog = try? dbService.getOrCreateDailyLog(for: Date()) else { return }
+
+        let entry = LogEntry(quantity: logQuantity)
+        entry.foodItem = food
+        entry.mealSlot = firstSlot
+        entry.dailyLog = dailyLog
+        entry.captureSnapshot(from: food)
+
+        food.usageCount += 1
+        food.lastUsedAt = Date()
+        food.updatedAt = Date()
+
+        modelContext.insert(entry)
+        try? modelContext.save()
+        HapticManager.success()
+
+        showLogSheet = false
+        showLogSuccess = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            showLogSuccess = false
+        }
     }
 
     // MARK: - Helpers
@@ -213,6 +322,12 @@ struct EditFoodView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var food: FoodItem
 
+    private var isValid: Bool {
+        !food.name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        food.servingSize > 0 &&
+        food.caloriesPerServing >= 0
+    }
+
     var body: some View {
         Form {
             Section {
@@ -232,6 +347,11 @@ struct EditFoodView: View {
                 }
             } header: {
                 Text("Details")
+            } footer: {
+                if food.name.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Name is required.")
+                        .foregroundStyle(.red)
+                }
             }
 
             Section {
@@ -257,6 +377,7 @@ struct EditFoodView: View {
                     food.updatedAt = Date()
                     dismiss()
                 }
+                .disabled(!isValid)
             }
         }
     }

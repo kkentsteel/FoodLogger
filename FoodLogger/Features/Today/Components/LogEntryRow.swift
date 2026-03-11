@@ -25,7 +25,7 @@ struct LogEntryRow: View {
                     .fontWeight(.medium)
 
                 HStack(spacing: 6) {
-                    Text("\(entry.quantity.formattedOneDecimal) serving")
+                    Text("\(entry.quantity.formattedOneDecimal) \(entry.quantity == 1.0 ? "serving" : "servings")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

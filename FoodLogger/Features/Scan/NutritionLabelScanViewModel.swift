@@ -109,20 +109,23 @@ final class NutritionLabelScanViewModel {
     func saveFoodItem(
         name: String,
         brand: String?,
+        calories: Double,
+        protein: Double,
+        carbs: Double,
+        fat: Double,
+        fiber: Double,
         context: ModelContext
     ) -> FoodItem? {
-        guard let nutrition = parsedNutrition else { return nil }
-
         let food = FoodItem(
             name: name,
             brand: brand,
             servingSize: 100,
             servingUnit: .grams,
-            caloriesPerServing: nutrition.calories ?? 0,
-            proteinPerServing: nutrition.protein ?? 0,
-            carbsPerServing: nutrition.carbs ?? 0,
-            fatPerServing: nutrition.fat ?? 0,
-            fiberPerServing: nutrition.fiber,
+            caloriesPerServing: calories,
+            proteinPerServing: protein,
+            carbsPerServing: carbs,
+            fatPerServing: fat,
+            fiberPerServing: fiber > 0 ? fiber : nil,
             source: .ocr
         )
         context.insert(food)
@@ -135,9 +138,14 @@ final class NutritionLabelScanViewModel {
     func saveAndLogFoodItem(
         name: String,
         brand: String?,
+        calories: Double,
+        protein: Double,
+        carbs: Double,
+        fat: Double,
+        fiber: Double,
         context: ModelContext
     ) {
-        guard let food = saveFoodItem(name: name, brand: brand, context: context) else { return }
+        guard let food = saveFoodItem(name: name, brand: brand, calories: calories, protein: protein, carbs: carbs, fat: fat, fiber: fiber, context: context) else { return }
 
         let dbService = FoodDatabaseService(modelContext: context)
         guard let dailyLog = try? dbService.getOrCreateDailyLog(for: Date()),
@@ -150,6 +158,7 @@ final class NutritionLabelScanViewModel {
         entry.dailyLog = dailyLog
         entry.foodItem = food
         entry.mealSlot = firstSlot
+        entry.captureSnapshot(from: food)
         context.insert(entry)
         food.usageCount += 1
         food.lastUsedAt = Date()

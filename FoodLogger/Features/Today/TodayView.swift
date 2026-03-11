@@ -16,10 +16,6 @@ struct TodayView: View {
 
     private var profile: UserProfile? { profiles.first }
 
-    private var hasAnyEntries: Bool {
-        viewModel.dailyLog?.entries.isEmpty == false
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -35,8 +31,8 @@ struct TodayView: View {
                         )
                         .padding(.horizontal)
 
-                        // Quick add (recent foods) — show when day has no entries yet
-                        if !hasAnyEntries && !recentFoods.isEmpty {
+                        // Quick add (recent foods)
+                        if !recentFoods.isEmpty {
                             QuickAddSection(recentFoods: recentFoods) { food in
                                 quickLogFood(food)
                             }
@@ -96,10 +92,22 @@ struct TodayView: View {
         }
     }
 
+    private var dateLabel: String {
+        if selectedDate.isToday {
+            return "Today"
+        } else if Calendar.current.isDateInYesterday(selectedDate) {
+            return "Yesterday"
+        } else {
+            return selectedDate.shortFormatted
+        }
+    }
+
     private var dateNavigationBar: some View {
         HStack {
             Button {
-                selectedDate = selectedDate.adding(days: -1)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedDate = selectedDate.adding(days: -1)
+                }
             } label: {
                 Image(systemName: "chevron.left")
             }
@@ -107,13 +115,16 @@ struct TodayView: View {
 
             Spacer()
 
-            Text(selectedDate.isToday ? "Today" : selectedDate.shortFormatted)
+            Text(dateLabel)
                 .font(.headline)
+                .contentTransition(.numericText())
 
             Spacer()
 
             Button {
-                selectedDate = selectedDate.adding(days: 1)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedDate = selectedDate.adding(days: 1)
+                }
             } label: {
                 Image(systemName: "chevron.right")
             }

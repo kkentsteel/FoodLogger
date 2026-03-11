@@ -47,5 +47,7 @@ struct QuickAddSection: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Quick add \(food.name)")
+        .accessibilityHint("Double tap to log 1 serving of \(food.name) to your first meal")
     }
 }

@@ -166,15 +166,16 @@ struct NutritionLabelParserTests {
         }
     }
 
-    @Test("Small kJ values not converted (could be kcal already)")
-    func smallKjNotConverted() {
+    @Test("Small kJ values are converted when label says kJ")
+    func smallKjConverted() {
         let blocks = makeBlocks([
             "Energy 250 kJ"
         ])
 
         let result = parser.parse(textBlocks: blocks)
-        // Value <= 500, so treated as kcal already
-        #expect(result.calories == 250)
+        // 250 kJ / 4.184 ≈ 60 kcal
+        let cal = result.calories ?? 0
+        #expect(cal > 55 && cal < 65)
     }
 
     @Test("kcal values not converted")

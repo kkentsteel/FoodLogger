@@ -9,9 +9,9 @@ enum Constants {
         static let claudeEndpoint = "https://api.anthropic.com/v1/messages"
         static let claudeModel = "claude-sonnet-4-20250514"
         static let claudeVersion = "2023-06-01"
-        static let claudeMaxTokens = 1024
+        static let claudeMaxTokens = 4096
 
-        static let offBaseURL = "https://world.openfoodfacts.net/api/v2/product"
+        static let offBaseURL = "https://world.openfoodfacts.org/api/v2/product"
         static let offUserAgent = "FoodLogger/1.0"
 
         static let matvaretabellenCompactFoodsURL = "https://www.matvaretabellen.no/api/nb/compact-foods.json"

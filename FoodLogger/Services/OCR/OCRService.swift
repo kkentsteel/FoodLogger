@@ -12,19 +12,25 @@ actor OCRService {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
+            let lock = NSLock()
             var hasResumed = false
 
-            let request = VNRecognizeTextRequest { request, error in
+            func resumeOnce(_ result: Result<[RecognizedTextBlock], Error>) {
+                lock.lock()
+                defer { lock.unlock() }
                 guard !hasResumed else { return }
                 hasResumed = true
+                continuation.resume(with: result)
+            }
 
+            let request = VNRecognizeTextRequest { request, error in
                 if let error {
-                    continuation.resume(throwing: OCRError.recognitionFailed(error))
+                    resumeOnce(.failure(OCRError.recognitionFailed(error)))
                     return
                 }
 
                 guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                    continuation.resume(returning: [])
+                    resumeOnce(.success([]))
                     return
                 }
 
@@ -37,7 +43,7 @@ actor OCRService {
                     )
                 }
 
-                continuation.resume(returning: blocks)
+                resumeOnce(.success(blocks))
             }
 
             request.recognitionLevel = .accurate
@@ -48,9 +54,7 @@ actor OCRService {
             do {
                 try handler.perform([request])
             } catch {
-                guard !hasResumed else { return }
-                hasResumed = true
-                continuation.resume(throwing: OCRError.recognitionFailed(error))
+                resumeOnce(.failure(OCRError.recognitionFailed(error)))
             }
         }
     }

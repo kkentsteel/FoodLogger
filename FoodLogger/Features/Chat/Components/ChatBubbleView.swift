@@ -53,8 +53,10 @@ struct ChatBubbleView: View {
     }
 
     private var formattedContent: Text {
-        // Try to render basic markdown, fallback to plain text
-        if let attributed = try? AttributedString(markdown: message.content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+        // Full markdown for assistant, inline-only for user
+        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
+            message.role == .assistant ? .full : .inlineOnlyPreservingWhitespace
+        if let attributed = try? AttributedString(markdown: message.content, options: .init(interpretedSyntax: syntax)) {
             return Text(attributed)
         }
         return Text(message.content)

@@ -32,11 +32,10 @@ struct ClaudeSystemPromptBuilder {
         - If you don't know something, say so honestly.
         """)
 
-        // User profile
-        if let profile = fetchUserProfile() {
+        // User profile (fetched once)
+        let profile = fetchUserProfile()
+        if let profile {
             sections.append(buildProfileSection(profile))
-
-            // Daily targets
             sections.append(buildTargetsSection(profile))
         }
 
@@ -45,8 +44,7 @@ struct ClaudeSystemPromptBuilder {
             let mealSlots = fetchMealSlots()
             sections.append(buildTodayLogSection(dailyLog, mealSlots: mealSlots))
 
-            // Remaining macros
-            if let profile = fetchUserProfile() {
+            if let profile {
                 sections.append(buildRemainingSection(dailyLog, profile: profile))
             }
         } else {
@@ -89,10 +87,14 @@ struct ClaudeSystemPromptBuilder {
         return lines.joined(separator: "\n")
     }
 
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter
+    }()
+
     private func buildTodayLogSection(_ dailyLog: DailyLog, mealSlots: [MealSlot]) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        let dateString = dateFormatter.string(from: dailyLog.date)
+        let dateString = Self.dateFormatter.string(from: dailyLog.date)
 
         var lines = ["TODAY'S LOG (\(dateString)):"]
         lines.append("Total consumed: \(Int(dailyLog.totalCalories)) kcal, \(Int(dailyLog.totalProtein))g protein, \(Int(dailyLog.totalCarbs))g carbs, \(Int(dailyLog.totalFat))g fat")

@@ -44,11 +44,14 @@ struct NutritionLabelParser {
     ]
 
     private static let fatKeywords = [
-        // English
-        "total fat", "fat",
+        // English — "total fat" first so it matches before standalone "fat"
+        "total fat",
         // Norwegian
-        "fett", "totalt fett"
+        "totalt fett", "fett"
     ]
+
+    /// Standalone "fat" is matched with word boundaries to avoid false positives
+    private static let fatWordBoundaryKeyword = "fat"
 
     private static let fiberKeywords = [
         // English
@@ -90,9 +93,18 @@ struct NutritionLabelParser {
                 result.carbs = extractNumericValue(from: line)
             }
 
-            if result.fat == nil, matchesAnyKeyword(lower, keywords: Self.fatKeywords) {
-                // Avoid matching "saturated fat" when looking for "fat"
-                if !lower.contains("saturated") && !lower.contains("trans") && !lower.contains("mettet") {
+            if result.fat == nil {
+                let isFatLine: Bool
+                if matchesAnyKeyword(lower, keywords: ["total fat", "totalt fett", "fett"]) {
+                    // Exact multi-word match — skip lines with "saturated"/"trans" prefix
+                    isFatLine = !lower.contains("saturated") && !lower.contains("trans") && !lower.contains("mettet")
+                } else if lower.range(of: #"\bfat\b"#, options: .regularExpression) != nil {
+                    // Word-boundary match for standalone "fat"
+                    isFatLine = !lower.contains("saturated") && !lower.contains("trans") && !lower.contains("mettet")
+                } else {
+                    isFatLine = false
+                }
+                if isFatLine {
                     result.fat = extractNumericValue(from: line)
                 }
             }
@@ -131,14 +143,15 @@ struct NutritionLabelParser {
 
     // MARK: - Value Extraction
 
+    // Pre-compiled regex for numeric extraction
+    private static let numericRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: #"(\d+[.,]?\d*)\s*(?:g|mg|kcal|kj|kJ|cal)?"#, options: .caseInsensitive)
+    }()
+
     /// Extracts the first numeric value from a string.
     /// Handles both `.` and `,` as decimal separators.
     func extractNumericValue(from text: String) -> Double? {
-        // Match numbers like: 52, 3.5, 12,4, 1234, 0.5
-        let pattern = #"(\d+[.,]?\d*)\s*(?:g|mg|kcal|kj|kJ|cal)?"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return nil
-        }
+        guard let regex = Self.numericRegex else { return nil }
 
         let range = NSRange(text.startIndex..., in: text)
         let matches = regex.matches(in: text, range: range)
@@ -178,8 +191,12 @@ struct NutritionLabelParser {
 
     /// Convert kJ to kcal if the line mentions kJ.
     private func convertToKcalIfNeeded(value: Double, line: String) -> Double {
-        if line.contains("kj") && value > 500 {
-            // Likely kJ, convert: 1 kcal = 4.184 kJ
+        // Check for explicit kJ mention (case-insensitive, already lowercased)
+        let hasKJ = line.range(of: #"\bkj\b"#, options: .regularExpression) != nil
+        let hasKcal = line.contains("kcal")
+
+        if hasKJ && !hasKcal {
+            // Convert kJ to kcal: 1 kcal = 4.184 kJ
             return (value / 4.184).rounded()
         }
         return value

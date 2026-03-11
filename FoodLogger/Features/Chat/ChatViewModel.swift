@@ -144,6 +144,22 @@ final class ChatViewModel {
         }
     }
 
+    // MARK: - Retry
+
+    func retryLastMessage(context: ModelContext) async {
+        // Find last user message to retry
+        guard let lastUserMessage = messages.last(where: { $0.role == .user }) else { return }
+        errorMessage = nil
+        inputText = lastUserMessage.content
+
+        // Remove the failed user message so sendMessage creates a fresh one
+        context.delete(lastUserMessage)
+        messages.removeAll { $0.id == lastUserMessage.id }
+        try? context.save()
+
+        await sendMessage(context: context)
+    }
+
     // MARK: - Suggested Prompts
 
     var suggestedPrompts: [String] {

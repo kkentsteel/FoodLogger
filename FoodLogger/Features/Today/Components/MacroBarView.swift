@@ -6,9 +6,21 @@ struct MacroBarView: View {
     let target: Double
     let color: Color
 
-    private var progress: Double {
+    private var rawProgress: Double {
         guard target > 0 else { return 0 }
-        return min(consumed / target, 1.0)
+        return consumed / target
+    }
+
+    private var clampedProgress: Double {
+        min(rawProgress, 1.0)
+    }
+
+    private var isOver: Bool {
+        rawProgress > 1.0
+    }
+
+    private var barColor: Color {
+        isOver ? .red : color
     }
 
     var body: some View {
@@ -21,6 +33,7 @@ struct MacroBarView: View {
                 Text("\(Int(consumed))g / \(Int(target))g")
                     .font(.caption)
                     .fontWeight(.medium)
+                    .foregroundStyle(isOver ? .red : .primary)
             }
 
             GeometryReader { geometry in
@@ -30,15 +43,15 @@ struct MacroBarView: View {
                         .frame(height: 8)
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(color)
-                        .frame(width: geometry.size.width * progress, height: 8)
-                        .animation(.easeInOut(duration: 0.3), value: progress)
+                        .fill(barColor)
+                        .frame(width: geometry.size.width * clampedProgress, height: 8)
+                        .animation(.easeInOut(duration: 0.3), value: clampedProgress)
                 }
             }
             .frame(height: 8)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label) progress")
-        .accessibilityValue("\(Int(consumed)) of \(Int(target)) grams, \(Int(progress * 100)) percent")
+        .accessibilityValue("\(Int(consumed)) of \(Int(target)) grams, \(Int(rawProgress * 100)) percent\(isOver ? ", over target" : "")")
     }
 }

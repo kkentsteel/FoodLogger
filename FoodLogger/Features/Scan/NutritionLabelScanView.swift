@@ -46,12 +46,12 @@ struct NutritionLabelScanView: View {
                 OCRResultView(
                     nutrition: nutrition,
                     capturedImage: viewModel.capturedImage,
-                    onSave: { name, brand in
-                        viewModel.saveFoodItem(name: name, brand: brand, context: modelContext)
+                    onSave: { name, brand, cal, pro, carb, fat, fib in
+                        viewModel.saveFoodItem(name: name, brand: brand, calories: cal, protein: pro, carbs: carb, fat: fat, fiber: fib, context: modelContext)
                         viewModel.resetForNewScan()
                     },
-                    onSaveAndLog: { name, brand in
-                        viewModel.saveAndLogFoodItem(name: name, brand: brand, context: modelContext)
+                    onSaveAndLog: { name, brand, cal, pro, carb, fat, fib in
+                        viewModel.saveAndLogFoodItem(name: name, brand: brand, calories: cal, protein: pro, carbs: carb, fat: fat, fiber: fib, context: modelContext)
                         viewModel.resetForNewScan()
                     },
                     onRetake: {

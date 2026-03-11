@@ -12,6 +12,7 @@ final class LogEntry {
     var snapshotProteinPerServing: Double
     var snapshotCarbsPerServing: Double
     var snapshotFatPerServing: Double
+    var snapshotFiberPerServing: Double?
 
     var dailyLog: DailyLog?
     var foodItem: FoodItem?
@@ -37,6 +38,10 @@ final class LogEntry {
         (foodItem?.fatPerServing ?? snapshotFatPerServing) * quantity
     }
 
+    var totalFiber: Double {
+        ((foodItem?.fiberPerServing ?? snapshotFiberPerServing) ?? 0) * quantity
+    }
+
     var displayName: String {
         foodItem?.name ?? snapshotFoodName ?? "Unknown Food"
     }
@@ -59,5 +64,6 @@ final class LogEntry {
         snapshotProteinPerServing = food.proteinPerServing
         snapshotCarbsPerServing = food.carbsPerServing
         snapshotFatPerServing = food.fatPerServing
+        snapshotFiberPerServing = food.fiberPerServing
     }
 }

@@ -36,6 +36,13 @@ struct ChatView: View {
                         ForEach(viewModel.messages, id: \.id) { message in
                             ChatBubbleView(message: message)
                                 .id(message.id)
+                                .contextMenu {
+                                    Button {
+                                        UIPasteboard.general.string = message.content
+                                    } label: {
+                                        Label("Copy", systemImage: "doc.on.doc")
+                                    }
+                                }
                         }
 
                         // Typing indicator
@@ -122,16 +129,29 @@ struct ChatView: View {
     // MARK: - Error Banner
 
     private func errorBanner(_ message: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            Button {
+                Task {
+                    await viewModel.retryLastMessage(context: modelContext)
+                }
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .font(.caption)
+            }
+            .buttonStyle(.bordered)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .background(Color(.systemOrange).opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)

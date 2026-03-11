@@ -4,8 +4,8 @@ import SwiftUI
 struct OCRResultView: View {
     let nutrition: NutritionLabelParser.ParsedNutrition
     let capturedImage: UIImage?
-    let onSave: (String, String?) -> Void
-    var onSaveAndLog: ((String, String?) -> Void)?
+    let onSave: (String, String?, Double, Double, Double, Double, Double) -> Void
+    var onSaveAndLog: ((String, String?, Double, Double, Double, Double, Double) -> Void)?
     let onRetake: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -77,7 +77,7 @@ struct OCRResultView: View {
                 if let saveAndLog = onSaveAndLog {
                     Section {
                         Button {
-                            saveAndLog(trimmedName, trimmedBrand)
+                            saveAndLog(trimmedName, trimmedBrand, calories, protein, carbs, fat, fiber)
                             dismiss()
                         } label: {
                             Label("Save & Log to Today", systemImage: "plus.circle.fill")
@@ -101,7 +101,7 @@ struct OCRResultView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(trimmedName, trimmedBrand)
+                        onSave(trimmedName, trimmedBrand, calories, protein, carbs, fat, fiber)
                         dismiss()
                     }
                     .disabled(!isValid)

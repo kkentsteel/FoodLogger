@@ -93,9 +93,35 @@ struct BarcodeScannerView: View {
                     Spacer().frame(height: 120)
                 }
             }
+
+            if viewModel.scanState == .error {
+                VStack {
+                    Spacer()
+                    barcodeErrorOverlay
+                    Spacer().frame(height: 120)
+                }
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Barcode scanner camera view")
+    }
+
+    private var barcodeErrorOverlay: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title)
+                .foregroundStyle(.orange)
+            Text(viewModel.errorMessage ?? "An error occurred")
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Button("Try Again") {
+                viewModel.resetForNewScan()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var torchButton: some View {
