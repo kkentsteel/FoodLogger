@@ -37,8 +37,7 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: step)
-                .disabled(true) // Prevent swipe navigation — use buttons only
-                .allowsHitTesting(true)
+                .scrollDisabled(true) // Prevent swipe navigation — use buttons only
             }
             .navigationTitle("Setup")
             .navigationBarTitleDisplayMode(.inline)

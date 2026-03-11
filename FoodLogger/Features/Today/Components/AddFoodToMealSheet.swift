@@ -8,6 +8,8 @@ struct AddFoodToMealSheet: View {
     let mealSlot: MealSlot?
     let date: Date
 
+    // MARK: - State
+
     @State private var searchText = ""
     @State private var quantity: Double = 1.0
     @State private var selectedFood: FoodItem?
@@ -18,9 +20,29 @@ struct AddFoodToMealSheet: View {
     @State private var isSearchingAPI = false
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedSlot: MealSlot?
+    @State private var selectedCategory: FoodCategory = .all
+
+    // Sub-sheet states
+    @State private var showQuickAddSheet = false
+    @State private var showVoiceLogSheet = false
+    @State private var showBarcodeScanSheet = false
+    @State private var showOCRScanSheet = false
+
+    // MARK: - Queries
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
     @Query(sort: \MealSlot.sortOrder) private var mealSlots: [MealSlot]
+    @Query(sort: \SavedMeal.name) private var savedMeals: [SavedMeal]
+
+    // MARK: - Enums
+
+    enum FoodCategory: String, CaseIterable {
+        case all = "All"
+        case myMeals = "My Meals"
+        case myFoods = "My Foods"
+    }
+
+    // MARK: - Computed
 
     private var activeSlot: MealSlot? {
         selectedSlot ?? mealSlot ?? mealSlots.first
@@ -41,18 +63,59 @@ struct AddFoodToMealSheet: View {
         allFoods
             .filter { $0.lastUsedAt != nil }
             .sorted { ($0.lastUsedAt ?? .distantPast) > ($1.lastUsedAt ?? .distantPast) }
-            .prefix(5)
+            .prefix(10)
             .map { $0 }
     }
 
+    private var myFoods: [FoodItem] {
+        let userSources: Set<FoodSource> = [.manual, .barcode, .ocr, .openFoodFacts]
+        if searchText.isEmpty {
+            return allFoods.filter { userSources.contains($0.source) }
+        }
+        let query = searchText.lowercased()
+        return allFoods.filter {
+            userSources.contains($0.source) &&
+            ($0.name.lowercased().contains(query) || ($0.brand?.lowercased().contains(query) ?? false))
+        }
+    }
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            Group {
-                if allFoods.isEmpty && searchText.isEmpty {
-                    emptyDatabaseView
-                } else {
-                    foodListView
+            VStack(spacing: 0) {
+                // Action buttons row
+                ActionButtonsRow(
+                    onBarcodeScan: { showBarcodeScanSheet = true },
+                    onVoiceLog: { showVoiceLogSheet = true },
+                    onMealScan: { showOCRScanSheet = true },
+                    onQuickAdd: { showQuickAddSheet = true }
+                )
+
+                // Category tabs
+                Picker("Category", selection: $selectedCategory) {
+                    ForEach(FoodCategory.allCases, id: \.self) { cat in
+                        Text(cat.rawValue).tag(cat)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+
+                // Meal slot picker (when opened from center + button)
+                if mealSlot == nil && mealSlots.count > 1 {
+                    Picker("Meal", selection: $selectedSlot) {
+                        ForEach(mealSlots) { slot in
+                            Text(slot.name).tag(Optional(slot))
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+
+                // Content
+                contentForCategory
             }
             .searchable(text: $searchText, prompt: "Search foods...")
             .onChange(of: searchText) {
@@ -87,6 +150,22 @@ struct AddFoodToMealSheet: View {
             .sheet(item: $selectedFood) { food in
                 quantitySheet(for: food)
             }
+            .sheet(isPresented: $showQuickAddSheet, onDismiss: { dismiss() }) {
+                if let slot = activeSlot {
+                    QuickAddSheet(mealSlot: slot, date: date)
+                }
+            }
+            .sheet(isPresented: $showVoiceLogSheet, onDismiss: { dismiss() }) {
+                if let slot = activeSlot {
+                    VoiceLogSheet(mealSlot: slot, date: date)
+                }
+            }
+            .sheet(isPresented: $showBarcodeScanSheet) {
+                BarcodeScannerView()
+            }
+            .sheet(isPresented: $showOCRScanSheet) {
+                NutritionLabelScanView()
+            }
             .alert("Error", isPresented: $showError) {
                 Button("OK") { }
             } message: {
@@ -95,138 +174,168 @@ struct AddFoodToMealSheet: View {
         }
     }
 
-    // MARK: - API Search
+    // MARK: - Category Content
 
-    private func onSearchTextChanged() {
-        searchTask?.cancel()
-
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty, query.count >= 2 else {
-            apiResults = []
-            isSearchingAPI = false
-            return
-        }
-
-        isSearchingAPI = true
-
-        searchTask = Task {
-            // Only debounce the API call, local search is instant via filteredFoods
-            try? await Task.sleep(for: .milliseconds(Constants.Defaults.searchDebounceMilliseconds))
-            guard !Task.isCancelled else { return }
-
-            do {
-                // Use search index to find food IDs, then look up in local DB
-                let foodIds = try await MatvaretabellenService.shared.searchFoodIds(query: query, limit: 20)
-                guard !Task.isCancelled else { return }
-
-                let dbService = FoodDatabaseService(modelContext: modelContext)
-                let foods = try dbService.findByMatvaretabellenIds(foodIds)
-                guard !Task.isCancelled else { return }
-
-                // Filter out foods already shown in the text search results
-                let localIds = Set(filteredFoods.map(\.id))
-                self.apiResults = foods.filter { !localIds.contains($0.id) }
-            } catch {
-                self.apiResults = []
-            }
-            self.isSearchingAPI = false
+    @ViewBuilder
+    private var contentForCategory: some View {
+        switch selectedCategory {
+        case .all:
+            allFoodsListView
+        case .myMeals:
+            savedMealsListView
+        case .myFoods:
+            myFoodsListView
         }
     }
 
-    // MARK: - Empty Database View
+    // MARK: - All Foods Tab
 
-    private var emptyDatabaseView: some View {
-        ContentUnavailableView {
-            Label("No Foods Yet", systemImage: "fork.knife")
-        } description: {
-            Text("Add your first food to start logging meals. You can also scan barcodes or nutrition labels from the Scan tab.")
-        } actions: {
-            Button {
-                showAddFoodView = true
-            } label: {
-                Label("Create Food", systemImage: "plus.circle.fill")
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    // MARK: - Food List
-
-    private var foodListView: some View {
+    private var allFoodsListView: some View {
         List {
-            if mealSlot == nil && mealSlots.count > 1 {
-                Section {
-                    Picker("Meal", selection: $selectedSlot) {
-                        ForEach(mealSlots) { slot in
-                            Text(slot.name).tag(Optional(slot))
-                        }
+            if allFoods.isEmpty && searchText.isEmpty {
+                ContentUnavailableView {
+                    Label("No Foods Yet", systemImage: "fork.knife")
+                } description: {
+                    Text("Add your first food to start logging meals.")
+                } actions: {
+                    Button {
+                        showAddFoodView = true
+                    } label: {
+                        Label("Create Food", systemImage: "plus.circle.fill")
                     }
-                    .pickerStyle(.segmented)
+                    .buttonStyle(.borderedProminent)
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            }
-
-            if searchText.isEmpty && !recentFoods.isEmpty {
-                Section("Recent") {
-                    ForEach(recentFoods) { food in
-                        foodRow(food)
-                    }
-                }
-            }
-
-            Section(searchText.isEmpty ? "All Foods" : "Results") {
-                ForEach(filteredFoods) { food in
-                    foodRow(food)
-                }
-            }
-
-            if !searchText.isEmpty {
-                if isSearchingAPI {
-                    Section("Matvaretabellen") {
-                        HStack {
-                            Spacer()
-                            ProgressView("Searching Matvaretabellen...")
-                                .font(.caption)
-                            Spacer()
-                        }
-                    }
-                } else if !apiResults.isEmpty {
-                    Section("Matvaretabellen (\(apiResults.count))") {
-                        ForEach(apiResults) { food in
+            } else {
+                if searchText.isEmpty && !recentFoods.isEmpty {
+                    Section("Recent") {
+                        ForEach(recentFoods) { food in
                             foodRow(food)
                         }
                     }
                 }
 
-                if filteredFoods.isEmpty && apiResults.isEmpty && !isSearchingAPI {
-                    ContentUnavailableView.search(text: searchText)
+                Section(searchText.isEmpty ? "All Foods" : "Results") {
+                    ForEach(filteredFoods) { food in
+                        foodRow(food)
+                    }
+                }
+
+                if !searchText.isEmpty {
+                    if isSearchingAPI {
+                        Section("Matvaretabellen") {
+                            HStack {
+                                Spacer()
+                                ProgressView("Searching Matvaretabellen...")
+                                    .font(.caption)
+                                Spacer()
+                            }
+                        }
+                    } else if !apiResults.isEmpty {
+                        Section("Matvaretabellen (\(apiResults.count))") {
+                            ForEach(apiResults) { food in
+                                foodRow(food)
+                            }
+                        }
+                    }
+
+                    if filteredFoods.isEmpty && apiResults.isEmpty && !isSearchingAPI {
+                        ContentUnavailableView.search(text: searchText)
+                    }
                 }
             }
         }
     }
 
-    private func foodRow(_ food: FoodItem) -> some View {
-        Button {
-            selectedFood = food
-        } label: {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(food.name)
-                    if let brand = food.brand, !brand.isEmpty {
-                        Text(brand)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+    // MARK: - My Meals Tab
+
+    private var savedMealsListView: some View {
+        List {
+            if savedMeals.isEmpty {
+                ContentUnavailableView(
+                    "No Saved Meals",
+                    systemImage: "tray",
+                    description: Text("Save food combinations as meals in the Foods tab.")
+                )
+            } else {
+                ForEach(savedMeals) { meal in
+                    HStack {
+                        SavedMealRow(meal: meal)
+
+                        Button {
+                            logSavedMeal(meal)
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.tint)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                Spacer()
-                Text(food.caloriesPerServing.formattedCalories)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
     }
+
+    // MARK: - My Foods Tab
+
+    private var myFoodsListView: some View {
+        List {
+            if myFoods.isEmpty {
+                ContentUnavailableView(
+                    searchText.isEmpty ? "No Personal Foods" : "No Results",
+                    systemImage: "fork.knife",
+                    description: Text(searchText.isEmpty
+                        ? "Foods you create manually will appear here."
+                        : "No matching foods found.")
+                )
+            } else {
+                ForEach(myFoods) { food in
+                    foodRow(food)
+                }
+            }
+        }
+    }
+
+    // MARK: - Food Row
+
+    private func foodRow(_ food: FoodItem) -> some View {
+        HStack {
+            Button {
+                selectedFood = food
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(food.name)
+                        if let brand = food.brand, !brand.isEmpty {
+                            Text(brand)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(food.caloriesPerServing.formattedCalories)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(food.servingSize.formattedOneDecimal) \(food.servingUnit.rawValue)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                quickLogFood(food)
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Quantity Sheet
 
     private func quantitySheet(for food: FoodItem) -> some View {
         NavigationStack {
@@ -281,6 +390,8 @@ struct AddFoodToMealSheet: View {
         .presentationDetents([.medium])
     }
 
+    // MARK: - Actions
+
     private func logFood(_ food: FoodItem) {
         guard let slot = activeSlot else {
             errorMessage = "No meal slot selected. Please select a meal."
@@ -303,5 +414,82 @@ struct AddFoodToMealSheet: View {
 
         selectedFood = nil
         dismiss()
+    }
+
+    private func quickLogFood(_ food: FoodItem) {
+        guard let slot = activeSlot else {
+            errorMessage = "No meal slot selected."
+            showError = true
+            HapticManager.error()
+            return
+        }
+
+        let dbService = FoodDatabaseService(modelContext: modelContext)
+        do {
+            try dbService.logFood(food, quantity: 1.0, mealSlot: slot, date: date)
+            HapticManager.success()
+            dismiss()
+        } catch {
+            errorMessage = "Failed to log food."
+            showError = true
+            HapticManager.error()
+        }
+    }
+
+    private func logSavedMeal(_ meal: SavedMeal) {
+        guard let slot = activeSlot else {
+            errorMessage = "No meal slot selected."
+            showError = true
+            HapticManager.error()
+            return
+        }
+
+        let dbService = FoodDatabaseService(modelContext: modelContext)
+        do {
+            let count = try dbService.logSavedMeal(meal, mealSlot: slot, date: date)
+            if count > 0 {
+                HapticManager.success()
+                dismiss()
+            }
+        } catch {
+            errorMessage = "Failed to log meal."
+            showError = true
+            HapticManager.error()
+        }
+    }
+
+    // MARK: - API Search
+
+    private func onSearchTextChanged() {
+        searchTask?.cancel()
+
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty, query.count >= 2 else {
+            apiResults = []
+            isSearchingAPI = false
+            return
+        }
+
+        isSearchingAPI = true
+
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(Constants.Defaults.searchDebounceMilliseconds))
+            guard !Task.isCancelled else { return }
+
+            do {
+                let foodIds = try await MatvaretabellenService.shared.searchFoodIds(query: query, limit: 20)
+                guard !Task.isCancelled else { return }
+
+                let dbService = FoodDatabaseService(modelContext: modelContext)
+                let foods = try dbService.findByMatvaretabellenIds(foodIds)
+                guard !Task.isCancelled else { return }
+
+                let localIds = Set(filteredFoods.map(\.id))
+                self.apiResults = foods.filter { !localIds.contains($0.id) }
+            } catch {
+                self.apiResults = []
+            }
+            self.isSearchingAPI = false
+        }
     }
 }

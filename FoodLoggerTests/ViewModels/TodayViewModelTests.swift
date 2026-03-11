@@ -13,7 +13,9 @@ struct TodayViewModelTests {
             FoodItem.self,
             DailyLog.self,
             LogEntry.self,
-            ChatMessage.self
+            ChatMessage.self,
+            SavedMeal.self,
+            SavedMealItem.self
         ])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [config])

@@ -164,6 +164,66 @@ final class FoodDatabaseService {
         return count
     }
 
+    // MARK: - Quick Add
+
+    /// Create a quick-add entry with raw calorie/macro values.
+    @discardableResult
+    func logQuickAdd(
+        calories: Double,
+        protein: Double = 0,
+        carbs: Double = 0,
+        fat: Double = 0,
+        mealSlot: MealSlot,
+        date: Date
+    ) throws -> LogEntry {
+        let food = FoodItem(
+            name: "Quick Add",
+            caloriesPerServing: calories,
+            proteinPerServing: protein,
+            carbsPerServing: carbs,
+            fatPerServing: fat
+        )
+        food.source = .quickAdd
+        food.servingLabel = "\(Int(calories)) kcal"
+        modelContext.insert(food)
+        return try logFood(food, quantity: 1.0, mealSlot: mealSlot, date: date)
+    }
+
+    // MARK: - Saved Meals
+
+    func savedMeals() throws -> [SavedMeal] {
+        let descriptor = FetchDescriptor<SavedMeal>(
+            sortBy: [SortDescriptor(\SavedMeal.name)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func recentSavedMeals(limit: Int = 5) throws -> [SavedMeal] {
+        let predicate = #Predicate<SavedMeal> { $0.lastUsedAt != nil }
+        var descriptor = FetchDescriptor<SavedMeal>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\SavedMeal.lastUsedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try modelContext.fetch(descriptor)
+    }
+
+    /// Log all items in a saved meal to a specific meal slot and date.
+    @discardableResult
+    func logSavedMeal(_ meal: SavedMeal, mealSlot: MealSlot, date: Date) throws -> Int {
+        var count = 0
+        for item in meal.items {
+            guard let food = item.foodItem else { continue }
+            try logFood(food, quantity: item.quantity, mealSlot: mealSlot, date: date)
+            count += 1
+        }
+        meal.usageCount += 1
+        meal.lastUsedAt = Date()
+        meal.updatedAt = Date()
+        try modelContext.save()
+        return count
+    }
+
     // MARK: - Meal Slot Helpers
 
     /// Returns the most appropriate meal slot based on the current time of day.

@@ -36,6 +36,18 @@ struct TodayView: View {
                         )
                         .padding(.horizontal)
 
+                        // Copy yesterday button (when log is empty)
+                        if viewModel.dailyLog == nil || (viewModel.dailyLog?.entries.isEmpty == true) {
+                            Button {
+                                copyPreviousDay()
+                            } label: {
+                                Label("Copy Yesterday's Log", systemImage: "doc.on.doc")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .padding(.horizontal)
+                        }
+
                         // Quick add (recent foods)
                         if !recentFoods.isEmpty {
                             QuickAddSection(recentFoods: recentFoods) { food in

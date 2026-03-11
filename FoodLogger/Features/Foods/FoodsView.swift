@@ -9,6 +9,7 @@ struct FoodsView: View {
     @State private var showDeleteConfirmation = false
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
+    @Query(sort: \SavedMeal.name) private var savedMeals: [SavedMeal]
 
     private var displayedFoods: [FoodItem] {
         switch viewModel.filterMode {
@@ -54,6 +55,9 @@ struct FoodsView: View {
             .navigationTitle("Foods")
             .navigationDestination(for: FoodItem.self) { food in
                 FoodDetailView(food: food)
+            }
+            .navigationDestination(for: SavedMeal.self) { meal in
+                SavedMealDetailView(meal: meal)
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -149,6 +153,22 @@ struct FoodsView: View {
 
     @ViewBuilder
     private var browseSections: some View {
+        if !savedMeals.isEmpty {
+            Section("Saved Meals") {
+                ForEach(savedMeals) { meal in
+                    NavigationLink(value: meal) {
+                        SavedMealRow(meal: meal)
+                    }
+                }
+            }
+        }
+
+        NavigationLink {
+            SavedMealsView()
+        } label: {
+            Label("Manage Saved Meals", systemImage: "tray.2.fill")
+        }
+
         if !viewModel.recentFoods.isEmpty {
             Section("Recent") {
                 ForEach(viewModel.recentFoods) { food in

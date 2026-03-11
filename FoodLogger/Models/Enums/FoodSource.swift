@@ -7,4 +7,6 @@ enum FoodSource: String, Codable, Hashable {
     case openFoodFacts
     case seed
     case matvaretabellen
+    case quickAdd
+    case aiParsed
 }
