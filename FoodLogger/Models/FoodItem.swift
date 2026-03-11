@@ -20,9 +20,51 @@ final class FoodItem {
     var fatPerServing: Double
     var fiberPerServing: Double?
 
+    // Micronutrients per serving
+    var saturatedFatPerServing: Double?
+    var monounsaturatedFatPerServing: Double?
+    var polyunsaturatedFatPerServing: Double?
+    var transFatPerServing: Double?
+    var omega3PerServing: Double?
+    var omega6PerServing: Double?
+    var cholesterolPerServing: Double?    // mg
+    var sugarPerServing: Double?
+    var addedSugarPerServing: Double?
+    var starchPerServing: Double?
+    var saltPerServing: Double?           // g (NaCl)
+    var waterPerServing: Double?
+
+    // Vitamins per serving
+    var vitaminAPerServing: Double?       // RAE (µg)
+    var vitaminDPerServing: Double?       // µg
+    var vitaminEPerServing: Double?       // mg-ATE
+    var vitaminCPerServing: Double?       // mg
+    var vitaminB1PerServing: Double?      // mg (thiamin)
+    var vitaminB2PerServing: Double?      // mg (riboflavin)
+    var vitaminB6PerServing: Double?      // mg
+    var vitaminB12PerServing: Double?     // µg
+    var niacinPerServing: Double?         // mg
+    var folatePerServing: Double?         // µg
+
+    // Minerals per serving
+    var calciumPerServing: Double?        // mg
+    var ironPerServing: Double?           // mg
+    var magnesiumPerServing: Double?      // mg
+    var potassiumPerServing: Double?      // mg
+    var sodiumPerServing: Double?         // mg
+    var zincPerServing: Double?           // mg
+    var seleniumPerServing: Double?       // µg
+    var phosphorusPerServing: Double?     // mg
+    var copperPerServing: Double?         // mg
+    var iodinePerServing: Double?         // µg
+
     // External identifiers
     var matvaretabellenId: String?
     var foodGroupId: String?
+    var foodGroupName: String?
+
+    // Edible part percentage (from Matvaretabellen)
+    var ediblePartPercent: Int?
 
     // Metadata
     var source: FoodSource

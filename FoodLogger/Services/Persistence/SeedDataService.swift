@@ -13,7 +13,6 @@ final class SeedDataService {
 
     private static let seedCompletedKey = "com.foodlogger.seedCompleted"
 
-    /// Whether the initial seed has already been performed (persists across launches).
     private var hasSeeded: Bool {
         get { UserDefaults.standard.bool(forKey: Self.seedCompletedKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.seedCompletedKey) }
@@ -38,14 +37,14 @@ final class SeedDataService {
 
         logger.info("First launch with no foods, starting seed...")
 
-        // Try API first
+        // Fetch compact foods + food groups in parallel
         do {
-            let count = try await seedFromMatvaretabellen()
-            logger.info("Seeded \(count) foods from Matvaretabellen API")
+            let count = try await seedFromCompactEndpoint()
+            logger.info("Seeded \(count) foods from Matvaretabellen compact API")
             hasSeeded = true
             return
         } catch {
-            logger.warning("Matvaretabellen API failed: \(error.localizedDescription). Falling back to local JSON.")
+            logger.warning("Matvaretabellen compact API failed: \(error.localizedDescription). Falling back to local JSON.")
         }
 
         // Fallback to local JSON
@@ -58,16 +57,22 @@ final class SeedDataService {
         }
     }
 
-    // MARK: - Matvaretabellen API Seed
+    // MARK: - Compact API Seed
 
-    private func seedFromMatvaretabellen() async throws -> Int {
+    private func seedFromCompactEndpoint() async throws -> Int {
         let service = MatvaretabellenService()
-        let apiFoods = try await service.fetchFoods()
+
+        // Fetch both compact foods and food groups
+        async let foodsTask = service.fetchCompactFoods()
+        async let groupsTask = service.fetchFoodGroups()
+        let (apiFoods, foodGroups) = try await (foodsTask, groupsTask)
+
+        // Build food group name lookup
+        let groupLookup = Dictionary(uniqueKeysWithValues: foodGroups.map { ($0.foodGroupId, $0.name) })
 
         var count = 0
         for apiFood in apiFoods {
             let kcal = apiFood.kcal
-            // Skip foods with no calorie data
             guard kcal > 0 || apiFood.protein > 0 || apiFood.carbs > 0 || apiFood.fat > 0 else {
                 continue
             }
@@ -76,7 +81,6 @@ final class SeedDataService {
                 name: apiFood.foodName,
                 servingSize: 100,
                 servingUnit: .grams,
-                servingLabel: apiFood.primaryPortionLabel,
                 caloriesPerServing: kcal,
                 proteinPerServing: apiFood.protein,
                 carbsPerServing: apiFood.carbs,
@@ -84,8 +88,58 @@ final class SeedDataService {
                 fiberPerServing: apiFood.fiber,
                 source: .matvaretabellen
             )
-            foodItem.matvaretabellenId = apiFood.foodId
+
+            // External IDs
+            foodItem.matvaretabellenId = apiFood.id
             foodItem.foodGroupId = apiFood.foodGroupId
+            foodItem.foodGroupName = resolveTopLevelGroupName(
+                foodGroupId: apiFood.foodGroupId,
+                groupLookup: groupLookup,
+                foodGroups: foodGroups
+            )
+            foodItem.ediblePartPercent = apiFood.ediblePart
+
+            // Fats
+            foodItem.saturatedFatPerServing = apiFood.saturatedFat
+            foodItem.monounsaturatedFatPerServing = apiFood.monounsaturatedFat
+            foodItem.polyunsaturatedFatPerServing = apiFood.polyunsaturatedFat
+            foodItem.transFatPerServing = apiFood.transFat
+            foodItem.omega3PerServing = apiFood.omega3
+            foodItem.omega6PerServing = apiFood.omega6
+            foodItem.cholesterolPerServing = apiFood.cholesterol
+
+            // Carbs detail
+            foodItem.sugarPerServing = apiFood.sugar
+            foodItem.addedSugarPerServing = apiFood.addedSugar
+            foodItem.starchPerServing = apiFood.starch
+
+            // Other
+            foodItem.saltPerServing = apiFood.salt
+            foodItem.waterPerServing = apiFood.water
+
+            // Vitamins
+            foodItem.vitaminAPerServing = apiFood.vitaminA
+            foodItem.vitaminDPerServing = apiFood.vitaminD
+            foodItem.vitaminEPerServing = apiFood.vitaminE
+            foodItem.vitaminCPerServing = apiFood.vitaminC
+            foodItem.vitaminB1PerServing = apiFood.vitaminB1
+            foodItem.vitaminB2PerServing = apiFood.vitaminB2
+            foodItem.vitaminB6PerServing = apiFood.vitaminB6
+            foodItem.vitaminB12PerServing = apiFood.vitaminB12
+            foodItem.niacinPerServing = apiFood.niacin
+            foodItem.folatePerServing = apiFood.folate
+
+            // Minerals
+            foodItem.calciumPerServing = apiFood.calcium
+            foodItem.ironPerServing = apiFood.iron
+            foodItem.magnesiumPerServing = apiFood.magnesium
+            foodItem.potassiumPerServing = apiFood.potassium
+            foodItem.sodiumPerServing = apiFood.sodium
+            foodItem.zincPerServing = apiFood.zinc
+            foodItem.seleniumPerServing = apiFood.selenium
+            foodItem.phosphorusPerServing = apiFood.phosphorus
+            foodItem.copperPerServing = apiFood.copper
+            foodItem.iodinePerServing = apiFood.iodine
 
             modelContext.insert(foodItem)
             count += 1
@@ -93,6 +147,23 @@ final class SeedDataService {
 
         try modelContext.save()
         return count
+    }
+
+    /// Walk up the food group hierarchy to find the top-level group name
+    private func resolveTopLevelGroupName(
+        foodGroupId: String,
+        groupLookup: [String: String],
+        foodGroups: [MatvaretabellenFoodGroup]
+    ) -> String? {
+        let byId = Dictionary(uniqueKeysWithValues: foodGroups.map { ($0.foodGroupId, $0) })
+        var current = byId[foodGroupId]
+
+        // Walk up to the top-level parent
+        while let parent = current, let parentId = parent.parentId, let parentGroup = byId[parentId] {
+            current = parentGroup
+        }
+
+        return current?.name ?? groupLookup[foodGroupId]
     }
 
     // MARK: - Local JSON Fallback

@@ -10,7 +10,7 @@ struct FoodDetailView: View {
 
     var body: some View {
         List {
-            Section("Details") {
+            Section {
                 LabeledContent("Name", value: food.name)
                 if let brand = food.brand, !brand.isEmpty {
                     LabeledContent("Brand", value: brand)
@@ -22,9 +22,14 @@ struct FoodDetailView: View {
                 if let barcode = food.barcode, !barcode.isEmpty {
                     LabeledContent("Barcode", value: barcode)
                 }
+                if let groupName = food.foodGroupName {
+                    LabeledContent("Category", value: groupName)
+                }
+            } header: {
+                Text("Details")
             }
 
-            Section("Nutrition (per serving)") {
+            Section {
                 LabeledContent("Calories", value: food.caloriesPerServing.formattedCalories)
                 LabeledContent("Protein", value: food.proteinPerServing.formattedGrams)
                 LabeledContent("Carbs", value: food.carbsPerServing.formattedGrams)
@@ -32,9 +37,83 @@ struct FoodDetailView: View {
                 if let fiber = food.fiberPerServing {
                     LabeledContent("Fiber", value: fiber.formattedGrams)
                 }
+            } header: {
+                Text("Macros (per serving)")
             }
 
-            Section("Info") {
+            // Fat breakdown
+            if hasFatDetails {
+                Section {
+                    optionalRow("Saturated", food.saturatedFatPerServing, unit: "g")
+                    optionalRow("Monounsaturated", food.monounsaturatedFatPerServing, unit: "g")
+                    optionalRow("Polyunsaturated", food.polyunsaturatedFatPerServing, unit: "g")
+                    optionalRow("Trans Fat", food.transFatPerServing, unit: "g")
+                    optionalRow("Omega-3", food.omega3PerServing, unit: "g")
+                    optionalRow("Omega-6", food.omega6PerServing, unit: "g")
+                    optionalRow("Cholesterol", food.cholesterolPerServing, unit: "mg")
+                } header: {
+                    Text("Fat Details")
+                }
+            }
+
+            // Carb breakdown
+            if hasCarbDetails {
+                Section {
+                    optionalRow("Sugar", food.sugarPerServing, unit: "g")
+                    optionalRow("Added Sugar", food.addedSugarPerServing, unit: "g")
+                    optionalRow("Starch", food.starchPerServing, unit: "g")
+                } header: {
+                    Text("Carb Details")
+                }
+            }
+
+            // Other
+            if hasSaltOrWater {
+                Section {
+                    optionalRow("Salt", food.saltPerServing, unit: "g")
+                    optionalRow("Water", food.waterPerServing, unit: "g")
+                } header: {
+                    Text("Other")
+                }
+            }
+
+            // Vitamins
+            if hasVitamins {
+                Section {
+                    optionalRow("Vitamin A", food.vitaminAPerServing, unit: "µg RAE")
+                    optionalRow("Vitamin D", food.vitaminDPerServing, unit: "µg")
+                    optionalRow("Vitamin E", food.vitaminEPerServing, unit: "mg")
+                    optionalRow("Vitamin C", food.vitaminCPerServing, unit: "mg")
+                    optionalRow("Thiamin (B1)", food.vitaminB1PerServing, unit: "mg")
+                    optionalRow("Riboflavin (B2)", food.vitaminB2PerServing, unit: "mg")
+                    optionalRow("Niacin (B3)", food.niacinPerServing, unit: "mg")
+                    optionalRow("Vitamin B6", food.vitaminB6PerServing, unit: "mg")
+                    optionalRow("Folate (B9)", food.folatePerServing, unit: "µg")
+                    optionalRow("Vitamin B12", food.vitaminB12PerServing, unit: "µg")
+                } header: {
+                    Text("Vitamins")
+                }
+            }
+
+            // Minerals
+            if hasMinerals {
+                Section {
+                    optionalRow("Calcium", food.calciumPerServing, unit: "mg")
+                    optionalRow("Iron", food.ironPerServing, unit: "mg")
+                    optionalRow("Magnesium", food.magnesiumPerServing, unit: "mg")
+                    optionalRow("Phosphorus", food.phosphorusPerServing, unit: "mg")
+                    optionalRow("Potassium", food.potassiumPerServing, unit: "mg")
+                    optionalRow("Sodium", food.sodiumPerServing, unit: "mg")
+                    optionalRow("Zinc", food.zincPerServing, unit: "mg")
+                    optionalRow("Copper", food.copperPerServing, unit: "mg")
+                    optionalRow("Selenium", food.seleniumPerServing, unit: "µg")
+                    optionalRow("Iodine", food.iodinePerServing, unit: "µg")
+                } header: {
+                    Text("Minerals")
+                }
+            }
+
+            Section {
                 LabeledContent("Source", value: food.source.rawValue.capitalized)
                 LabeledContent("Times Used", value: "\(food.usageCount)")
                 if let lastUsed = food.lastUsedAt {
@@ -43,6 +122,8 @@ struct FoodDetailView: View {
                 LabeledContent("Created", value: food.createdAt.shortFormatted)
 
                 Toggle("Favorite", isOn: $food.isFavorite)
+            } header: {
+                Text("Info")
             }
 
             Section {
@@ -75,6 +156,57 @@ struct FoodDetailView: View {
             }
         }
     }
+
+    // MARK: - Helpers
+
+    @ViewBuilder
+    private func optionalRow(_ label: String, _ value: Double?, unit: String) -> some View {
+        if let value, value > 0 {
+            LabeledContent(label, value: formatNutrient(value, unit: unit))
+        }
+    }
+
+    private func formatNutrient(_ value: Double, unit: String) -> String {
+        if value < 0.1 && value > 0 {
+            return String(format: "%.3f %@", value, unit)
+        } else if value < 10 {
+            return String(format: "%.1f %@", value, unit)
+        } else {
+            return String(format: "%.0f %@", value, unit)
+        }
+    }
+
+    private var hasFatDetails: Bool {
+        [food.saturatedFatPerServing, food.monounsaturatedFatPerServing,
+         food.polyunsaturatedFatPerServing, food.transFatPerServing,
+         food.omega3PerServing, food.omega6PerServing, food.cholesterolPerServing]
+            .contains { ($0 ?? 0) > 0 }
+    }
+
+    private var hasCarbDetails: Bool {
+        [food.sugarPerServing, food.addedSugarPerServing, food.starchPerServing]
+            .contains { ($0 ?? 0) > 0 }
+    }
+
+    private var hasSaltOrWater: Bool {
+        [food.saltPerServing, food.waterPerServing].contains { ($0 ?? 0) > 0 }
+    }
+
+    private var hasVitamins: Bool {
+        [food.vitaminAPerServing, food.vitaminDPerServing, food.vitaminEPerServing,
+         food.vitaminCPerServing, food.vitaminB1PerServing, food.vitaminB2PerServing,
+         food.vitaminB6PerServing, food.vitaminB12PerServing, food.niacinPerServing,
+         food.folatePerServing]
+            .contains { ($0 ?? 0) > 0 }
+    }
+
+    private var hasMinerals: Bool {
+        [food.calciumPerServing, food.ironPerServing, food.magnesiumPerServing,
+         food.potassiumPerServing, food.sodiumPerServing, food.zincPerServing,
+         food.seleniumPerServing, food.phosphorusPerServing, food.copperPerServing,
+         food.iodinePerServing]
+            .contains { ($0 ?? 0) > 0 }
+    }
 }
 
 struct EditFoodView: View {
@@ -83,7 +215,7 @@ struct EditFoodView: View {
 
     var body: some View {
         Form {
-            Section("Details") {
+            Section {
                 TextField("Name", text: $food.name)
                 TextField("Brand (optional)", text: Binding(
                     get: { food.brand ?? "" },
@@ -98,9 +230,11 @@ struct EditFoodView: View {
                         }
                     }
                 }
+            } header: {
+                Text("Details")
             }
 
-            Section("Nutrition (per serving)") {
+            Section {
                 TextField("Calories (kcal)", value: $food.caloriesPerServing, format: .number)
                     .keyboardType(.decimalPad)
                 TextField("Protein (g)", value: $food.proteinPerServing, format: .number)
@@ -111,6 +245,8 @@ struct EditFoodView: View {
                     .keyboardType(.decimalPad)
                 TextField("Fiber (g, optional)", value: $food.fiberPerServing, format: .number)
                     .keyboardType(.decimalPad)
+            } header: {
+                Text("Nutrition (per serving)")
             }
         }
         .navigationTitle("Edit Food")

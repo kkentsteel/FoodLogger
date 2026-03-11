@@ -33,10 +33,6 @@ struct FoodLoggerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .task {
-                    let seedService = SeedDataService(modelContext: modelContainer.mainContext)
-                    await seedService.seedIfNeeded()
-                }
         }
         .modelContainer(modelContainer)
     }
