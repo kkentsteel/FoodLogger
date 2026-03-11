@@ -2,11 +2,11 @@ import AVFoundation
 import Foundation
 
 /// Handles barcode detection from camera metadata output.
-final class BarcodeService: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+final class BarcodeService: NSObject, @unchecked Sendable, AVCaptureMetadataOutputObjectsDelegate {
     let metadataOutput = AVCaptureMetadataOutput()
 
     /// Called when a barcode is detected.
-    var onBarcodeDetected: ((String) -> Void)?
+    var onBarcodeDetected: (@Sendable (String) -> Void)?
 
     /// Supported barcode types for food products.
     static let supportedTypes: [AVMetadataObject.ObjectType] = [

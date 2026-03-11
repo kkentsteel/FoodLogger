@@ -137,7 +137,7 @@ actor MatvaretabellenService {
 
         let foods = try JSONDecoder().decode([CompactFood].self, from: data)
         cachedCompactFoods = foods
-        compactFoodsById = Dictionary(uniqueKeysWithValues: foods.map { ($0.id, $0) })
+        compactFoodsById = Dictionary(foods.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         cacheTimestamp = Date()
         return foods
     }
@@ -148,7 +148,7 @@ actor MatvaretabellenService {
             return cached[id]
         }
         let foods = try await fetchCompactFoods()
-        let lookup = Dictionary(uniqueKeysWithValues: foods.map { ($0.id, $0) })
+        let lookup = Dictionary(foods.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         compactFoodsById = lookup
         return lookup[id]
     }
@@ -173,7 +173,7 @@ actor MatvaretabellenService {
 
         let groups = try JSONDecoder().decode([MatvaretabellenFoodGroup].self, from: data)
         cachedFoodGroups = groups
-        foodGroupsById = Dictionary(uniqueKeysWithValues: groups.map { ($0.foodGroupId, $0) })
+        foodGroupsById = Dictionary(groups.map { ($0.foodGroupId, $0) }, uniquingKeysWith: { _, last in last })
         return groups
     }
 

@@ -18,7 +18,7 @@ struct DailySummaryCard: View {
 
     private var progress: Double {
         guard targetCalories > 0 else { return 0 }
-        return min(consumedCalories / targetCalories, 1.0)
+        return consumedCalories / targetCalories
     }
 
     var body: some View {

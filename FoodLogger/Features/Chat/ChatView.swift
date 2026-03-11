@@ -14,6 +14,7 @@ struct ChatView: View {
             }
         }
         .onAppear {
+            viewModel.checkAPIKey()
             viewModel.loadMessages(context: modelContext)
         }
     }

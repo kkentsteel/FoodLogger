@@ -168,8 +168,9 @@ struct FoodsView: View {
     }
 
     private func deleteFoods(at offsets: IndexSet) {
-        for index in offsets {
-            let food = displayedFoods[index]
+        let foods = displayedFoods
+        let toDelete = offsets.map { foods[$0] }
+        for food in toDelete {
             viewModel.deleteFood(food, context: modelContext)
         }
     }

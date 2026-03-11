@@ -60,7 +60,7 @@ final class SeedDataService {
     // MARK: - Compact API Seed
 
     private func seedFromCompactEndpoint() async throws -> Int {
-        let service = MatvaretabellenService()
+        let service = MatvaretabellenService.shared
 
         // Fetch both compact foods and food groups
         async let foodsTask = service.fetchCompactFoods()

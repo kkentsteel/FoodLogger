@@ -42,10 +42,14 @@ struct ChatBubbleView: View {
         message.role == .user ? .white : .primary
     }
 
-    private var timeString: String {
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: message.createdAt)
+        return formatter
+    }()
+
+    private var timeString: String {
+        Self.timeFormatter.string(from: message.createdAt)
     }
 
     private var formattedContent: Text {

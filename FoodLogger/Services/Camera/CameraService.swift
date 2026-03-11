@@ -6,6 +6,10 @@ final class CameraService: NSObject, @unchecked Sendable {
     let captureSession = AVCaptureSession()
     private var videoDeviceInput: AVCaptureDeviceInput?
     private let photoOutput = AVCapturePhotoOutput()
+    private var photoOutputAdded = false
+
+    // Protected by lock to avoid race between capturePhoto() and delegate callback
+    private let continuationLock = NSLock()
     private var photoContinuation: CheckedContinuation<UIImage, Error>?
 
     var isSessionRunning: Bool {
@@ -59,17 +63,21 @@ final class CameraService: NSObject, @unchecked Sendable {
             videoDeviceInput = videoInput
         }
 
-        // Add photo output
+        // Add photo output only once
+        guard !photoOutputAdded else { return }
         guard captureSession.canAddOutput(photoOutput) else {
             throw CameraError.cannotAddOutput
         }
         captureSession.addOutput(photoOutput)
+        photoOutputAdded = true
     }
 
     /// Captures a photo and returns a UIImage.
     func capturePhoto() async throws -> UIImage {
         try await withCheckedThrowingContinuation { continuation in
+            continuationLock.lock()
             self.photoContinuation = continuation
+            continuationLock.unlock()
             let settings = AVCapturePhotoSettings()
             photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -84,13 +92,21 @@ final class CameraService: NSObject, @unchecked Sendable {
     }
 
     func startSession() {
-        guard !captureSession.isRunning else { return }
-        captureSession.startRunning()
+        let session = captureSession
+        DispatchQueue.global(qos: .userInitiated).async {
+            if !session.isRunning {
+                session.startRunning()
+            }
+        }
     }
 
     func stopSession() {
-        guard captureSession.isRunning else { return }
-        captureSession.stopRunning()
+        let session = captureSession
+        DispatchQueue.global(qos: .userInitiated).async {
+            if session.isRunning {
+                session.stopRunning()
+            }
+        }
     }
 }
 
@@ -102,21 +118,25 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        continuationLock.lock()
+        let continuation = photoContinuation
+        photoContinuation = nil
+        continuationLock.unlock()
+
+        guard let continuation else { return }
+
         if let error {
-            photoContinuation?.resume(throwing: error)
-            photoContinuation = nil
+            continuation.resume(throwing: error)
             return
         }
 
         guard let data = photo.fileDataRepresentation(),
               let image = UIImage(data: data) else {
-            photoContinuation?.resume(throwing: CameraError.cannotCapturePhoto)
-            photoContinuation = nil
+            continuation.resume(throwing: CameraError.cannotCapturePhoto)
             return
         }
 
-        photoContinuation?.resume(returning: image)
-        photoContinuation = nil
+        continuation.resume(returning: image)
     }
 }
 

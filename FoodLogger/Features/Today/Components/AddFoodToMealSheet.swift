@@ -59,7 +59,10 @@ struct AddFoodToMealSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        searchTask?.cancel()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Food") { showAddFoodView = true }
@@ -267,6 +270,7 @@ struct AddFoodToMealSheet: View {
         entry.foodItem = food
         entry.mealSlot = mealSlot
         entry.dailyLog = dailyLog
+        entry.captureSnapshot(from: food)
 
         food.usageCount += 1
         food.lastUsedAt = Date()

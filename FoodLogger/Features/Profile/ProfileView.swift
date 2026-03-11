@@ -5,9 +5,6 @@ struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [UserProfile]
     @Query(sort: \MealSlot.sortOrder) private var mealSlots: [MealSlot]
-    @Query private var allFoods: [FoodItem]
-    @Query private var allLogs: [DailyLog]
-    @Query private var chatMessages: [ChatMessage]
 
     @State private var showDeleteFoodsConfirmation = false
     @State private var showDeleteLogsConfirmation = false
@@ -15,12 +12,12 @@ struct ProfileView: View {
     @State private var showDeleteAllConfirmation = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var foodCount = 0
+    @State private var logCount = 0
+    @State private var entryCount = 0
+    @State private var chatCount = 0
 
     private var profile: UserProfile? { profiles.first }
-
-    private var totalLogEntries: Int {
-        allLogs.reduce(0) { $0 + $1.entries.count }
-    }
 
     var body: some View {
         NavigationStack {
@@ -86,10 +83,10 @@ struct ProfileView: View {
                     }
 
                     Section {
-                        LabeledContent("Foods in Database", value: "\(allFoods.count)")
-                        LabeledContent("Daily Logs", value: "\(allLogs.count)")
-                        LabeledContent("Log Entries", value: "\(totalLogEntries)")
-                        LabeledContent("Chat Messages", value: "\(chatMessages.count)")
+                        LabeledContent("Foods in Database", value: "\(foodCount)")
+                        LabeledContent("Daily Logs", value: "\(logCount)")
+                        LabeledContent("Log Entries", value: "\(entryCount)")
+                        LabeledContent("Chat Messages", value: "\(chatCount)")
                     } header: {
                         Text("Data")
                     }
@@ -100,21 +97,21 @@ struct ProfileView: View {
                         } label: {
                             Label("Delete All Foods", systemImage: "fork.knife")
                         }
-                        .disabled(allFoods.isEmpty)
+                        .disabled(foodCount == 0)
 
                         Button(role: .destructive) {
                             showDeleteLogsConfirmation = true
                         } label: {
                             Label("Delete All Logs", systemImage: "calendar.badge.minus")
                         }
-                        .disabled(allLogs.isEmpty)
+                        .disabled(logCount == 0)
 
                         Button(role: .destructive) {
                             showDeleteChatsConfirmation = true
                         } label: {
                             Label("Delete Chat History", systemImage: "bubble.left.and.bubble.right")
                         }
-                        .disabled(chatMessages.isEmpty)
+                        .disabled(chatCount == 0)
 
                         Button(role: .destructive) {
                             showDeleteAllConfirmation = true
@@ -122,7 +119,7 @@ struct ProfileView: View {
                             Label("Delete All Data", systemImage: "trash")
                                 .bold()
                         }
-                        .disabled(allFoods.isEmpty && allLogs.isEmpty && chatMessages.isEmpty)
+                        .disabled(foodCount == 0 && logCount == 0 && chatCount == 0)
                     } header: {
                         Text("Data Management")
                     } footer: {
@@ -130,38 +127,39 @@ struct ProfileView: View {
                     }
                 }
                 .navigationTitle("Profile")
+                .onAppear { refreshCounts() }
                 .confirmationDialog(
                     "Delete All Foods?",
                     isPresented: $showDeleteFoodsConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Delete \(allFoods.count) Foods", role: .destructive) {
+                    Button("Delete \(foodCount) Foods", role: .destructive) {
                         deleteAllFoods()
                     }
                 } message: {
-                    Text("This will delete all \(allFoods.count) foods and their associated log entries. This cannot be undone.")
+                    Text("This will delete all \(foodCount) foods. This cannot be undone.")
                 }
                 .confirmationDialog(
                     "Delete All Logs?",
                     isPresented: $showDeleteLogsConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Delete \(allLogs.count) Logs", role: .destructive) {
+                    Button("Delete \(logCount) Logs", role: .destructive) {
                         deleteAllLogs()
                     }
                 } message: {
-                    Text("This will delete all \(allLogs.count) daily logs and \(totalLogEntries) log entries. This cannot be undone.")
+                    Text("This will delete all \(logCount) daily logs and \(entryCount) log entries. This cannot be undone.")
                 }
                 .confirmationDialog(
                     "Delete Chat History?",
                     isPresented: $showDeleteChatsConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Delete \(chatMessages.count) Messages", role: .destructive) {
+                    Button("Delete \(chatCount) Messages", role: .destructive) {
                         deleteAllChats()
                     }
                 } message: {
-                    Text("This will delete all \(chatMessages.count) chat messages. This cannot be undone.")
+                    Text("This will delete all \(chatCount) chat messages. This cannot be undone.")
                 }
                 .confirmationDialog(
                     "Delete All Data?",
@@ -190,15 +188,23 @@ struct ProfileView: View {
         }
     }
 
+    // MARK: - Counts
+
+    private func refreshCounts() {
+        foodCount = (try? modelContext.fetchCount(FetchDescriptor<FoodItem>())) ?? 0
+        logCount = (try? modelContext.fetchCount(FetchDescriptor<DailyLog>())) ?? 0
+        entryCount = (try? modelContext.fetchCount(FetchDescriptor<LogEntry>())) ?? 0
+        chatCount = (try? modelContext.fetchCount(FetchDescriptor<ChatMessage>())) ?? 0
+    }
+
     // MARK: - Delete Actions
 
     private func deleteAllFoods() {
         do {
-            for food in allFoods {
-                modelContext.delete(food)
-            }
+            try modelContext.delete(model: FoodItem.self)
             try modelContext.save()
             HapticManager.success()
+            refreshCounts()
         } catch {
             errorMessage = "Failed to delete foods: \(error.localizedDescription)"
             showError = true
@@ -208,11 +214,13 @@ struct ProfileView: View {
 
     private func deleteAllLogs() {
         do {
-            for log in allLogs {
-                modelContext.delete(log)
-            }
+            // Delete log entries first (since DailyLog cascade will handle its own,
+            // but orphaned entries from nullified food/meal relationships need cleanup)
+            try modelContext.delete(model: LogEntry.self)
+            try modelContext.delete(model: DailyLog.self)
             try modelContext.save()
             HapticManager.success()
+            refreshCounts()
         } catch {
             errorMessage = "Failed to delete logs: \(error.localizedDescription)"
             showError = true
@@ -222,11 +230,10 @@ struct ProfileView: View {
 
     private func deleteAllChats() {
         do {
-            for message in chatMessages {
-                modelContext.delete(message)
-            }
+            try modelContext.delete(model: ChatMessage.self)
             try modelContext.save()
             HapticManager.success()
+            refreshCounts()
         } catch {
             errorMessage = "Failed to delete chat history: \(error.localizedDescription)"
             showError = true
@@ -236,17 +243,13 @@ struct ProfileView: View {
 
     private func deleteAllData() {
         do {
-            for food in allFoods {
-                modelContext.delete(food)
-            }
-            for log in allLogs {
-                modelContext.delete(log)
-            }
-            for message in chatMessages {
-                modelContext.delete(message)
-            }
+            try modelContext.delete(model: LogEntry.self)
+            try modelContext.delete(model: FoodItem.self)
+            try modelContext.delete(model: DailyLog.self)
+            try modelContext.delete(model: ChatMessage.self)
             try modelContext.save()
             HapticManager.success()
+            refreshCounts()
         } catch {
             errorMessage = "Failed to delete data: \(error.localizedDescription)"
             showError = true

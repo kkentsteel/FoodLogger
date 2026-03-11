@@ -4,8 +4,14 @@ import Foundation
 @Model
 final class LogEntry {
     var quantity: Double
-    var customServingSize: Double?
     var notes: String?
+
+    // Snapshot fields — captured at creation so totals survive food deletion
+    var snapshotFoodName: String?
+    var snapshotCaloriesPerServing: Double
+    var snapshotProteinPerServing: Double
+    var snapshotCarbsPerServing: Double
+    var snapshotFatPerServing: Double
 
     var dailyLog: DailyLog?
     var foodItem: FoodItem?
@@ -14,32 +20,44 @@ final class LogEntry {
     var createdAt: Date
     var updatedAt: Date
 
-    // Computed nutrition based on quantity
-    var effectiveServingSize: Double {
-        customServingSize ?? (foodItem?.servingSize ?? 0)
-    }
-
+    // Computed nutrition based on quantity — falls back to snapshots when foodItem is nil
     var totalCalories: Double {
-        (foodItem?.caloriesPerServing ?? 0) * quantity
+        (foodItem?.caloriesPerServing ?? snapshotCaloriesPerServing) * quantity
     }
 
     var totalProtein: Double {
-        (foodItem?.proteinPerServing ?? 0) * quantity
+        (foodItem?.proteinPerServing ?? snapshotProteinPerServing) * quantity
     }
 
     var totalCarbs: Double {
-        (foodItem?.carbsPerServing ?? 0) * quantity
+        (foodItem?.carbsPerServing ?? snapshotCarbsPerServing) * quantity
     }
 
     var totalFat: Double {
-        (foodItem?.fatPerServing ?? 0) * quantity
+        (foodItem?.fatPerServing ?? snapshotFatPerServing) * quantity
     }
 
-    init(quantity: Double = 1.0, customServingSize: Double? = nil, notes: String? = nil) {
+    var displayName: String {
+        foodItem?.name ?? snapshotFoodName ?? "Unknown Food"
+    }
+
+    init(quantity: Double = 1.0, notes: String? = nil) {
         self.quantity = quantity
-        self.customServingSize = customServingSize
         self.notes = notes
+        self.snapshotCaloriesPerServing = 0
+        self.snapshotProteinPerServing = 0
+        self.snapshotCarbsPerServing = 0
+        self.snapshotFatPerServing = 0
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+
+    /// Set snapshot fields from a food item. Call this when creating a new entry.
+    func captureSnapshot(from food: FoodItem) {
+        snapshotFoodName = food.name
+        snapshotCaloriesPerServing = food.caloriesPerServing
+        snapshotProteinPerServing = food.proteinPerServing
+        snapshotCarbsPerServing = food.carbsPerServing
+        snapshotFatPerServing = food.fatPerServing
     }
 }

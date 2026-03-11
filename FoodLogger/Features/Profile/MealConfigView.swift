@@ -59,6 +59,8 @@ struct MealConfigView: View {
 
     private func deleteSlots(at offsets: IndexSet) {
         let slots = sortedSlots
+        // Prevent deleting the last meal slot
+        guard slots.count - offsets.count >= 1 else { return }
         for index in offsets {
             modelContext.delete(slots[index])
         }

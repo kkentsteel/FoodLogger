@@ -42,7 +42,7 @@ struct BarcodeServiceTests {
     @Test("Callback can be set")
     func callbackCanBeSet() {
         let service = BarcodeService()
-        var called = false
+        nonisolated(unsafe) var called = false
 
         service.onBarcodeDetected = { _ in
             called = true
@@ -58,7 +58,7 @@ struct BarcodeServiceTests {
     @Test("Callback receives barcode string")
     func callbackReceivesBarcode() {
         let service = BarcodeService()
-        var receivedBarcode: String?
+        nonisolated(unsafe) var receivedBarcode: String?
 
         service.onBarcodeDetected = { barcode in
             receivedBarcode = barcode
@@ -71,7 +71,7 @@ struct BarcodeServiceTests {
     @Test("Callback fires for different barcodes")
     func callbackMultipleBarcodes() {
         let service = BarcodeService()
-        var barcodes: [String] = []
+        nonisolated(unsafe) var barcodes: [String] = []
 
         service.onBarcodeDetected = { barcode in
             barcodes.append(barcode)

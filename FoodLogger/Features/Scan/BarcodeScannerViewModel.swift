@@ -256,6 +256,7 @@ final class BarcodeScannerViewModel {
         entry.dailyLog = dailyLog
         entry.foodItem = food
         entry.mealSlot = firstSlot
+        entry.captureSnapshot(from: food)
         context.insert(entry)
         food.usageCount += 1
         food.lastUsedAt = Date()

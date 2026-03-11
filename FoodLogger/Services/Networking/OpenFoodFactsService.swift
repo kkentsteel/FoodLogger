@@ -57,7 +57,15 @@ actor OpenFoodFactsService {
 
     /// Look up a food product by barcode. Returns nil if not found.
     func lookupBarcode(_ barcode: String) async throws -> OFFProduct? {
-        let urlString = "\(Constants.API.offBaseURL)/\(barcode).json"
+        // Validate barcode contains only digits and is a plausible length
+        let trimmed = barcode.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty,
+              trimmed.allSatisfy(\.isNumber),
+              (7...14).contains(trimmed.count) else {
+            throw NetworkError.invalidURL
+        }
+
+        let urlString = "\(Constants.API.offBaseURL)/\(trimmed).json"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }

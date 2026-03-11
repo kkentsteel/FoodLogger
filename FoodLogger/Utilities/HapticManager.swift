@@ -1,40 +1,40 @@
 import UIKit
 
 /// Centralized haptic feedback manager.
+@MainActor
 enum HapticManager {
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+
     /// Light tap — used for UI interactions (selecting, toggling).
     static func lightTap() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        lightGenerator.impactOccurred()
     }
 
     /// Medium tap — used for confirmations (food logged, scan complete).
     static func mediumTap() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        mediumGenerator.impactOccurred()
     }
 
     /// Success notification — used for achievements (target reached, scan success).
     static func success() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        notificationGenerator.notificationOccurred(.success)
     }
 
     /// Warning notification — used for alerts (approaching limit, OCR low confidence).
     static func warning() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+        notificationGenerator.notificationOccurred(.warning)
     }
 
     /// Error notification — used for failures (scan failed, API error).
     static func error() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
+        notificationGenerator.notificationOccurred(.error)
     }
 
     /// Selection tick — used for picker changes, stepper increments.
     static func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+        selectionGenerator.selectionChanged()
     }
 }

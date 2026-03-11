@@ -107,7 +107,7 @@ struct ClaudeSystemPromptBuilder {
             lines.append("")
             lines.append("\(slot.name):")
             for entry in slotEntries.sorted(by: { $0.createdAt < $1.createdAt }) {
-                let name = entry.foodItem?.name ?? "Unknown"
+                let name = entry.displayName
                 let qty = entry.quantity
                 let cal = Int(entry.totalCalories)
                 let p = Int(entry.totalProtein)
@@ -123,7 +123,7 @@ struct ClaudeSystemPromptBuilder {
             lines.append("")
             lines.append("Other:")
             for entry in unslottedEntries {
-                let name = entry.foodItem?.name ?? "Unknown"
+                let name = entry.displayName
                 let cal = Int(entry.totalCalories)
                 lines.append("  - \(name): \(cal) kcal")
             }

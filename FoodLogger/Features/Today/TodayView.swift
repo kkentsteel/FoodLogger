@@ -9,16 +9,12 @@ struct TodayView: View {
     @State private var selectedMealSlot: MealSlot?
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var recentFoods: [FoodItem] = []
 
     @Query private var profiles: [UserProfile]
     @Query(sort: \MealSlot.sortOrder) private var mealSlots: [MealSlot]
 
     private var profile: UserProfile? { profiles.first }
-
-    private var recentFoods: [FoodItem] {
-        let dbService = FoodDatabaseService(modelContext: modelContext)
-        return (try? dbService.recentFoods(limit: 8)) ?? []
-    }
 
     private var hasAnyEntries: Bool {
         viewModel.dailyLog?.entries.isEmpty == false
@@ -47,7 +43,7 @@ struct TodayView: View {
                         }
 
                         // Meal sections
-                        ForEach(mealSlots.sorted(by: { $0.sortOrder < $1.sortOrder })) { slot in
+                        ForEach(mealSlots) { slot in
                             MealSectionView(
                                 mealSlot: slot,
                                 entries: viewModel.entriesForSlot(slot),
@@ -107,6 +103,7 @@ struct TodayView: View {
             } label: {
                 Image(systemName: "chevron.left")
             }
+            .accessibilityLabel("Previous day")
 
             Spacer()
 
@@ -121,17 +118,20 @@ struct TodayView: View {
                 Image(systemName: "chevron.right")
             }
             .disabled(Calendar.current.isDateInToday(selectedDate))
+            .accessibilityLabel("Next day")
         }
         .padding(.horizontal)
     }
 
     private func loadDailyLog() {
         viewModel.loadDailyLog(for: selectedDate, context: modelContext)
+        let dbService = FoodDatabaseService(modelContext: modelContext)
+        recentFoods = (try? dbService.recentFoods(limit: 8)) ?? []
     }
 
     /// Quick-log a food to the first meal slot with 1x serving.
     private func quickLogFood(_ food: FoodItem) {
-        guard let firstSlot = mealSlots.sorted(by: { $0.sortOrder < $1.sortOrder }).first else {
+        guard let firstSlot = mealSlots.first else {
             errorMessage = "No meal slots configured. Add meal slots in your profile settings."
             showError = true
             HapticManager.error()
@@ -144,6 +144,7 @@ struct TodayView: View {
             entry.foodItem = food
             entry.mealSlot = firstSlot
             entry.dailyLog = dailyLog
+            entry.captureSnapshot(from: food)
 
             food.usageCount += 1
             food.lastUsedAt = Date()

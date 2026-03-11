@@ -70,7 +70,10 @@ actor ClaudeAPIService {
         self.session = URLSession(configuration: config)
     }
 
-    /// Send a message to Claude and get a response.
+    private static let maxRetries = 2
+    private static let baseRetryDelay: TimeInterval = 1.0
+
+    /// Send a message to Claude and get a response. Retries on 429/5xx.
     func sendMessage(
         apiKey: String,
         systemPrompt: String?,
@@ -95,38 +98,51 @@ actor ClaudeAPIService {
 
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await session.data(for: request)
+        var lastError: Error = ClaudeAPIError.invalidResponse
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ClaudeAPIError.invalidResponse
+        for attempt in 0...Self.maxRetries {
+            if attempt > 0 {
+                let delay = Self.baseRetryDelay * pow(2.0, Double(attempt - 1))
+                try await Task.sleep(for: .seconds(delay))
+            }
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ClaudeAPIError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200:
+                let decoded = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+                guard let text = decoded.content.first?.text else {
+                    throw ClaudeAPIError.emptyResponse
+                }
+                return text
+
+            case 401:
+                throw ClaudeAPIError.invalidAPIKey
+
+            case 429:
+                lastError = ClaudeAPIError.rateLimited
+                continue // retry
+
+            case 400...499:
+                if let errorResponse = try? JSONDecoder().decode(ClaudeErrorResponse.self, from: data) {
+                    throw ClaudeAPIError.apiError(errorResponse.error.message)
+                }
+                throw ClaudeAPIError.httpError(httpResponse.statusCode)
+
+            case 500...599:
+                lastError = ClaudeAPIError.serverError
+                continue // retry
+
+            default:
+                throw ClaudeAPIError.httpError(httpResponse.statusCode)
+            }
         }
 
-        switch httpResponse.statusCode {
-        case 200:
-            let decoded = try JSONDecoder().decode(ClaudeResponse.self, from: data)
-            guard let text = decoded.content.first?.text else {
-                throw ClaudeAPIError.emptyResponse
-            }
-            return text
-
-        case 401:
-            throw ClaudeAPIError.invalidAPIKey
-
-        case 429:
-            throw ClaudeAPIError.rateLimited
-
-        case 400...499:
-            if let errorResponse = try? JSONDecoder().decode(ClaudeErrorResponse.self, from: data) {
-                throw ClaudeAPIError.apiError(errorResponse.error.message)
-            }
-            throw ClaudeAPIError.httpError(httpResponse.statusCode)
-
-        case 500...599:
-            throw ClaudeAPIError.serverError
-
-        default:
-            throw ClaudeAPIError.httpError(httpResponse.statusCode)
-        }
+        throw lastError
     }
 }
 

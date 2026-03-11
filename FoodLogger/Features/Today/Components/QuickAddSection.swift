@@ -7,9 +7,7 @@ struct QuickAddSection: View {
     let onQuickAdd: (FoodItem) -> Void
 
     var body: some View {
-        if recentFoods.isEmpty { return AnyView(EmptyView()) }
-
-        return AnyView(
+        if !recentFoods.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Quick Add")
                     .font(.subheadline)
@@ -26,7 +24,7 @@ struct QuickAddSection: View {
                     .padding(.horizontal)
                 }
             }
-        )
+        }
     }
 
     private func quickAddChip(for food: FoodItem) -> some View {

@@ -13,7 +13,7 @@ struct CalorieRingView: View {
 
             // Progress ring
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: 0, to: min(progress, 1.0))
                 .stroke(
                     progress > 1.0 ? Color.red : Color.green,
                     style: StrokeStyle(lineWidth: 16, lineCap: .round)

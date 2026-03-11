@@ -29,10 +29,10 @@ struct BarcodeScannerView: View {
             viewModel.stopScanning()
         }
         .sheet(isPresented: showResultSheet) {
-            if viewModel.scannedFood != nil {
+            if let food = viewModel.scannedFood {
                 ScanResultView(
                     result: Binding(
-                        get: { viewModel.scannedFood! },
+                        get: { viewModel.scannedFood ?? food },
                         set: { viewModel.scannedFood = $0 }
                     ),
                     isNewFood: viewModel.scanState == .notFound,

@@ -75,7 +75,7 @@ final class FoodItem {
     var updatedAt: Date
 
     // Relationships
-    @Relationship(deleteRule: .cascade, inverse: \LogEntry.foodItem)
+    @Relationship(deleteRule: .nullify, inverse: \LogEntry.foodItem)
     var logEntries: [LogEntry]
 
     // Computed: macros per gram

@@ -9,7 +9,7 @@ final class MealSlot {
 
     var userProfile: UserProfile?
 
-    @Relationship(deleteRule: .cascade, inverse: \LogEntry.mealSlot)
+    @Relationship(deleteRule: .nullify, inverse: \LogEntry.mealSlot)
     var logEntries: [LogEntry]
 
     init(name: String, sortOrder: Int, iconName: String = "fork.knife") {

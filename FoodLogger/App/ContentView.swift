@@ -36,9 +36,17 @@ struct ContentView: View {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
         }
-        .onAppear {
-            if !hasProfile {
+        .onChange(of: profiles.isEmpty) { _, isEmpty in
+            if isEmpty && !showOnboarding {
                 showOnboarding = true
+            }
+        }
+        .onAppear {
+            // Delay slightly to let @Query populate
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if !hasProfile {
+                    showOnboarding = true
+                }
             }
         }
         .sheet(isPresented: $showOnboarding) {

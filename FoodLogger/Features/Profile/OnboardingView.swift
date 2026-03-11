@@ -37,11 +37,22 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: step)
+                .disabled(true) // Prevent swipe navigation — use buttons only
+                .allowsHitTesting(true)
             }
             .navigationTitle("Setup")
             .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled()
+            .alert("Save Error", isPresented: $showSaveError) {
+                Button("Try Again") { createProfile() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Failed to save your profile. Please try again.")
+            }
         }
     }
+
+    @State private var showSaveError = false
 
     // MARK: - Step 0: Welcome
     private var welcomeStep: some View {
@@ -193,7 +204,11 @@ struct OnboardingView: View {
             modelContext.insert(mealSlot)
         }
 
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            showSaveError = true
+        }
     }
 }

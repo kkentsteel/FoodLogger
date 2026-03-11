@@ -94,6 +94,12 @@ final class FoodsViewModel {
 
     /// Import a CompactFood from the API into the local database as a FoodItem
     func importFood(_ compactFood: CompactFood, context: ModelContext) -> FoodItem {
+        // Check if already imported
+        let dbService = FoodDatabaseService(modelContext: context)
+        if let existing = try? dbService.findByMatvaretabellenId(compactFood.id) {
+            return existing
+        }
+
         let foodItem = FoodItem(
             name: compactFood.foodName,
             servingSize: 100,
