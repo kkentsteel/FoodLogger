@@ -35,10 +35,12 @@ struct DailyLogTests {
 
         let entry1 = LogEntry(quantity: 2.0)
         entry1.foodItem = food1
+        entry1.captureSnapshot(from: food1)
         entry1.dailyLog = log
 
         let entry2 = LogEntry(quantity: 1.0)
         entry2.foodItem = food2
+        entry2.captureSnapshot(from: food2)
         entry2.dailyLog = log
 
         log.entries = [entry1, entry2]

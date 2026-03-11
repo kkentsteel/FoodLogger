@@ -5,6 +5,8 @@ struct FoodsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = FoodsViewModel()
     @State private var navigationPath = NavigationPath()
+    @State private var foodToDelete: FoodItem?
+    @State private var showDeleteConfirmation = false
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
 
@@ -42,6 +44,9 @@ struct FoodsView: View {
             .onChange(of: viewModel.searchText) {
                 viewModel.onSearchTextChanged(context: modelContext)
             }
+            .refreshable {
+                viewModel.loadSections(context: modelContext)
+            }
             .onAppear {
                 viewModel.loadSections(context: modelContext)
                 viewModel.warmAPICache()
@@ -68,6 +73,21 @@ struct FoodsView: View {
                     } label: {
                         Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                     }
+                }
+            }
+            .alert("Delete Food?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    if let food = foodToDelete {
+                        viewModel.deleteFood(food, context: modelContext)
+                        foodToDelete = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) { foodToDelete = nil }
+            } message: {
+                if let food = foodToDelete {
+                    Text(food.logEntries.count > 0
+                         ? "'\(food.name)' has been logged \(food.logEntries.count) time(s). Deleting it will also remove those log entries."
+                         : "Are you sure you want to delete '\(food.name)'?")
                 }
             }
         }
@@ -169,9 +189,16 @@ struct FoodsView: View {
 
     private func deleteFoods(at offsets: IndexSet) {
         let foods = displayedFoods
-        let toDelete = offsets.map { foods[$0] }
-        for food in toDelete {
-            viewModel.deleteFood(food, context: modelContext)
-        }
+        guard let first = offsets.first else { return }
+        foodToDelete = foods[first]
+        showDeleteConfirmation = true
+    }
+}
+
+// MARK: - Delete Confirmation (added to body via extension)
+extension FoodsView {
+    @ViewBuilder
+    var deleteConfirmationModifier: some View {
+        EmptyView()
     }
 }

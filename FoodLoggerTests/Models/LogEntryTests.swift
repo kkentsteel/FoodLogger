@@ -18,6 +18,7 @@ struct LogEntryTests {
 
         let entry = LogEntry(quantity: 2.0)
         entry.foodItem = food
+        entry.captureSnapshot(from: food)
 
         #expect(entry.totalCalories == 260)
         #expect(entry.totalProtein == 5.4)
@@ -37,6 +38,7 @@ struct LogEntryTests {
 
         let entry = LogEntry(quantity: 0.5)
         entry.foodItem = food
+        entry.captureSnapshot(from: food)
 
         #expect(entry.totalCalories == 100)
         #expect(entry.totalProtein == 4)

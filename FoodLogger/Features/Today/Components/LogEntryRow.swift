@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LogEntryRow: View {
     let entry: LogEntry
+    var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
     var body: some View {
@@ -36,10 +37,23 @@ struct LogEntryRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let onEdit {
+                HapticManager.lightTap()
+                onEdit()
+            }
+        }
         .contextMenu {
+            if let onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Label("Edit Quantity", systemImage: "pencil")
+                }
+            }
             if let onDelete {
                 Button(role: .destructive) {
-                    HapticManager.mediumTap()
                     onDelete()
                 } label: {
                     Label("Delete", systemImage: "trash")

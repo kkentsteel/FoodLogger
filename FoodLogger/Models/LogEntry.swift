@@ -21,25 +21,25 @@ final class LogEntry {
     var createdAt: Date
     var updatedAt: Date
 
-    // Computed nutrition based on quantity — falls back to snapshots when foodItem is nil
+    // Computed nutrition based on quantity — always uses snapshots for historical accuracy
     var totalCalories: Double {
-        (foodItem?.caloriesPerServing ?? snapshotCaloriesPerServing) * quantity
+        snapshotCaloriesPerServing * quantity
     }
 
     var totalProtein: Double {
-        (foodItem?.proteinPerServing ?? snapshotProteinPerServing) * quantity
+        snapshotProteinPerServing * quantity
     }
 
     var totalCarbs: Double {
-        (foodItem?.carbsPerServing ?? snapshotCarbsPerServing) * quantity
+        snapshotCarbsPerServing * quantity
     }
 
     var totalFat: Double {
-        (foodItem?.fatPerServing ?? snapshotFatPerServing) * quantity
+        snapshotFatPerServing * quantity
     }
 
     var totalFiber: Double {
-        ((foodItem?.fiberPerServing ?? snapshotFiberPerServing) ?? 0) * quantity
+        (snapshotFiberPerServing ?? 0) * quantity
     }
 
     var displayName: String {

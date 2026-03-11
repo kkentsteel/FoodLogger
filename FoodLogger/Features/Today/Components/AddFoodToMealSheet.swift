@@ -5,7 +5,7 @@ struct AddFoodToMealSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    let mealSlot: MealSlot
+    let mealSlot: MealSlot?
     let date: Date
 
     @State private var searchText = ""
@@ -17,8 +17,14 @@ struct AddFoodToMealSheet: View {
     @State private var apiResults: [FoodItem] = []
     @State private var isSearchingAPI = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var selectedSlot: MealSlot?
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
+    @Query(sort: \MealSlot.sortOrder) private var mealSlots: [MealSlot]
+
+    private var activeSlot: MealSlot? {
+        selectedSlot ?? mealSlot ?? mealSlots.first
+    }
 
     private var filteredFoods: [FoodItem] {
         if searchText.isEmpty {
@@ -52,10 +58,15 @@ struct AddFoodToMealSheet: View {
             .onChange(of: searchText) {
                 onSearchTextChanged()
             }
+            .onAppear {
+                if selectedSlot == nil {
+                    selectedSlot = mealSlot ?? mealSlots.first
+                }
+            }
             .task {
                 _ = try? await MatvaretabellenService.shared.fetchSearchIndex()
             }
-            .navigationTitle("Add to \(mealSlot.name)")
+            .navigationTitle(mealSlot != nil ? "Add to \(mealSlot!.name)" : "Add Food")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -99,7 +110,8 @@ struct AddFoodToMealSheet: View {
         isSearchingAPI = true
 
         searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(Constants.Defaults.searchDebounceMilliseconds + 200))
+            // Only debounce the API call, local search is instant via filteredFoods
+            try? await Task.sleep(for: .milliseconds(Constants.Defaults.searchDebounceMilliseconds))
             guard !Task.isCancelled else { return }
 
             do {
@@ -142,6 +154,19 @@ struct AddFoodToMealSheet: View {
 
     private var foodListView: some View {
         List {
+            if mealSlot == nil && mealSlots.count > 1 {
+                Section {
+                    Picker("Meal", selection: $selectedSlot) {
+                        ForEach(mealSlots) { slot in
+                            Text(slot.name).tag(Optional(slot))
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            }
+
             if searchText.isEmpty && !recentFoods.isEmpty {
                 Section("Recent") {
                     ForEach(recentFoods) { food in
@@ -257,29 +282,17 @@ struct AddFoodToMealSheet: View {
     }
 
     private func logFood(_ food: FoodItem) {
-        let dbService = FoodDatabaseService(modelContext: modelContext)
-
-        guard let dailyLog = try? dbService.getOrCreateDailyLog(for: date) else {
-            errorMessage = "Failed to create daily log. Please try again."
+        guard let slot = activeSlot else {
+            errorMessage = "No meal slot selected. Please select a meal."
             showError = true
             HapticManager.error()
             return
         }
 
-        let entry = LogEntry(quantity: quantity)
-        entry.foodItem = food
-        entry.mealSlot = mealSlot
-        entry.dailyLog = dailyLog
-        entry.captureSnapshot(from: food)
-
-        food.usageCount += 1
-        food.lastUsedAt = Date()
-        food.updatedAt = Date()
-
-        modelContext.insert(entry)
+        let dbService = FoodDatabaseService(modelContext: modelContext)
 
         do {
-            try modelContext.save()
+            try dbService.logFood(food, quantity: quantity, mealSlot: slot, date: date)
             HapticManager.success()
         } catch {
             errorMessage = "Failed to save food entry. Please try again."

@@ -240,23 +240,16 @@ struct FoodDetailView: View {
     }
 
     private func logFoodToToday() {
-        guard let firstSlot = mealSlots.first else { return }
+        let slot = FoodDatabaseService.mealSlotForCurrentTime(from: Array(mealSlots)) ?? mealSlots.first
+        guard let slot else { return }
+
         let dbService = FoodDatabaseService(modelContext: modelContext)
-        guard let dailyLog = try? dbService.getOrCreateDailyLog(for: Date()) else { return }
-
-        let entry = LogEntry(quantity: logQuantity)
-        entry.foodItem = food
-        entry.mealSlot = firstSlot
-        entry.dailyLog = dailyLog
-        entry.captureSnapshot(from: food)
-
-        food.usageCount += 1
-        food.lastUsedAt = Date()
-        food.updatedAt = Date()
-
-        modelContext.insert(entry)
-        try? modelContext.save()
-        HapticManager.success()
+        do {
+            try dbService.logFood(food, quantity: logQuantity, mealSlot: slot, date: Date())
+            HapticManager.success()
+        } catch {
+            return
+        }
 
         showLogSheet = false
         showLogSuccess = true

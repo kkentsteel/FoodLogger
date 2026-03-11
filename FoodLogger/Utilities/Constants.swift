@@ -30,4 +30,8 @@ enum Constants {
         static let defaultCalorieTarget = 2000
         static let searchDebounceMilliseconds = 300
     }
+
+    enum Theme {
+        static let accentColorName = "AccentGreen"
+    }
 }

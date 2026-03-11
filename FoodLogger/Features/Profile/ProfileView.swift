@@ -16,6 +16,8 @@ struct ProfileView: View {
     @State private var logCount = 0
     @State private var entryCount = 0
     @State private var chatCount = 0
+    @State private var showExportSheet = false
+    @State private var exportCSV: String?
 
     private var profile: UserProfile? { profiles.first }
 
@@ -87,6 +89,13 @@ struct ProfileView: View {
                         LabeledContent("Daily Logs", value: "\(logCount)")
                         LabeledContent("Log Entries", value: "\(entryCount)")
                         LabeledContent("Chat Messages", value: "\(chatCount)")
+
+                        Button {
+                            exportData()
+                        } label: {
+                            Label("Export Data (CSV)", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(entryCount == 0)
                     } header: {
                         Text("Data")
                     }
@@ -135,7 +144,7 @@ struct ProfileView: View {
                         Text("Deleting foods will also remove any associated log entries.")
                     }
                 }
-                .navigationTitle("Profile")
+                .navigationTitle("Settings")
                 .onAppear { refreshCounts() }
                 .confirmationDialog(
                     "Delete All Foods?",
@@ -186,13 +195,18 @@ struct ProfileView: View {
                 } message: {
                     Text(errorMessage)
                 }
+                .sheet(isPresented: $showExportSheet) {
+                    if let csv = exportCSV {
+                        ShareSheetView(text: csv)
+                    }
+                }
             } else {
                 ContentUnavailableView(
                     "No Profile",
                     systemImage: "person.crop.circle.badge.questionmark",
                     description: Text("Complete the setup to get started.")
                 )
-                .navigationTitle("Profile")
+                .navigationTitle("Settings")
             }
         }
     }
@@ -245,6 +259,20 @@ struct ProfileView: View {
             refreshCounts()
         } catch {
             errorMessage = "Failed to delete chat history: \(error.localizedDescription)"
+            showError = true
+            HapticManager.error()
+        }
+    }
+
+    private func exportData() {
+        let dbService = FoodDatabaseService(modelContext: modelContext)
+        let endDate = Date()
+        let startDate = endDate.adding(days: -365)
+        do {
+            exportCSV = try dbService.exportAsCSV(from: startDate, to: endDate)
+            showExportSheet = true
+        } catch {
+            errorMessage = "Failed to export data: \(error.localizedDescription)"
             showError = true
             HapticManager.error()
         }

@@ -162,13 +162,50 @@ final class ChatViewModel {
 
     // MARK: - Suggested Prompts
 
-    var suggestedPrompts: [String] {
-        [
-            "What should I eat for dinner?",
-            "Am I on track today?",
-            "How much protein do I have left?",
-            "Suggest a high-protein snack"
-        ]
+    func suggestedPrompts(context: ModelContext) -> [String] {
+        var prompts: [String] = []
+
+        // Time-based meal suggestion
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 11 {
+            prompts.append("What should I have for breakfast?")
+        } else if hour < 15 {
+            prompts.append("What should I eat for lunch?")
+        } else {
+            prompts.append("What should I eat for dinner?")
+        }
+
+        // Check remaining macros for contextual prompts
+        if let remaining = fetchRemainingMacros(context: context) {
+            if remaining.protein > 30 {
+                prompts.append("I need \(Int(remaining.protein))g more protein. Ideas?")
+            }
+            if remaining.calories > 0 && remaining.calories < 400 {
+                prompts.append("What's a snack under \(Int(remaining.calories)) kcal?")
+            }
+        }
+
+        prompts.append("Am I on track today?")
+        return Array(prompts.prefix(4))
+    }
+
+    private func fetchRemainingMacros(context: ModelContext) -> (calories: Double, protein: Double)? {
+        var profileDescriptor = FetchDescriptor<UserProfile>()
+        profileDescriptor.fetchLimit = 1
+        guard let profile = try? context.fetch(profileDescriptor).first else { return nil }
+
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        let predicate = #Predicate<DailyLog> { $0.date == startOfDay }
+        var logDescriptor = FetchDescriptor<DailyLog>(predicate: predicate)
+        logDescriptor.fetchLimit = 1
+        let dailyLog = try? context.fetch(logDescriptor).first
+
+        let consumed = dailyLog?.totalCalories ?? 0
+        let consumedProtein = dailyLog?.totalProtein ?? 0
+        return (
+            calories: Double(profile.targetCalories) - consumed,
+            protein: (profile.targetProteinGrams ?? 0) - consumedProtein
+        )
     }
 
     func sendSuggestedPrompt(_ prompt: String, context: ModelContext) async {

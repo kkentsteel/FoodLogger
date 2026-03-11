@@ -52,13 +52,22 @@ struct ChatBubbleView: View {
         Self.timeFormatter.string(from: message.createdAt)
     }
 
-    private var formattedContent: Text {
-        // Full markdown for assistant, inline-only for user
-        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
-            message.role == .assistant ? .full : .inlineOnlyPreservingWhitespace
-        if let attributed = try? AttributedString(markdown: message.content, options: .init(interpretedSyntax: syntax)) {
-            return Text(attributed)
+    @ViewBuilder
+    private var formattedContent: some View {
+        if message.role == .assistant {
+            let options = AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .full,
+                failurePolicy: .returnPartiallyParsedIfPossible
+            )
+            if let attributed = try? AttributedString(markdown: message.content, options: options) {
+                Text(attributed)
+                    .textSelection(.enabled)
+            } else {
+                Text(message.content)
+                    .textSelection(.enabled)
+            }
+        } else {
+            Text(message.content)
         }
-        return Text(message.content)
     }
 }

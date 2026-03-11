@@ -117,7 +117,7 @@ struct ChatView: View {
                     .padding(.horizontal, 32)
             }
 
-            SuggestedPromptsView(prompts: viewModel.suggestedPrompts) { prompt in
+            SuggestedPromptsView(prompts: viewModel.suggestedPrompts(context: modelContext)) { prompt in
                 Task {
                     await viewModel.sendSuggestedPrompt(prompt, context: modelContext)
                 }

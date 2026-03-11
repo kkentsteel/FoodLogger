@@ -4,37 +4,39 @@ import SwiftData
 struct ContentView: View {
     @Query private var profiles: [UserProfile]
     @State private var showOnboarding = false
+    @State private var selectedTab: AppTab = .today
+    @State private var showAddFood = false
 
     private var hasProfile: Bool {
         !profiles.isEmpty
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TodayView()
-                .tabItem {
-                    Label("Today", systemImage: "calendar")
-                }
+                .tag(AppTab.today)
+                .tabItem { Label("Today", systemImage: "calendar") }
 
             FoodsView()
-                .tabItem {
-                    Label("Foods", systemImage: "fork.knife")
-                }
+                .tag(AppTab.foods)
+                .tabItem { Label("Foods", systemImage: "fork.knife") }
 
             ScanTabView()
-                .tabItem {
-                    Label("Scan", systemImage: "barcode.viewfinder")
-                }
+                .tag(AppTab.scan)
+                .tabItem { Label("Scan", systemImage: "barcode.viewfinder") }
 
             ChatView()
-                .tabItem {
-                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
-                }
-
-            ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle")
-                }
+                .tag(AppTab.chat)
+                .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
+        }
+        .toolbar(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom) {
+            CustomTabBar(selectedTab: $selectedTab) {
+                showAddFood = true
+            }
+        }
+        .sheet(isPresented: $showAddFood) {
+            AddFoodToMealSheet(mealSlot: nil, date: Date())
         }
         .onChange(of: profiles.isEmpty) { _, isEmpty in
             if isEmpty && !showOnboarding {
@@ -42,11 +44,8 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // Delay slightly to let @Query populate
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if !hasProfile {
-                    showOnboarding = true
-                }
+            if !hasProfile {
+                showOnboarding = true
             }
         }
         .sheet(isPresented: $showOnboarding) {
