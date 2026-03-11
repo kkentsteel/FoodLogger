@@ -14,6 +14,9 @@ struct AddFoodToMealSheet: View {
     @State private var showAddFoodView = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var apiResults: [FoodItem] = []
+    @State private var isSearchingAPI = false
+    @State private var searchTask: Task<Void, Never>?
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
 
@@ -46,6 +49,12 @@ struct AddFoodToMealSheet: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Search foods...")
+            .onChange(of: searchText) {
+                onSearchTextChanged()
+            }
+            .task {
+                _ = try? await MatvaretabellenService.shared.fetchSearchIndex()
+            }
             .navigationTitle("Add to \(mealSlot.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -69,6 +78,43 @@ struct AddFoodToMealSheet: View {
             } message: {
                 Text(errorMessage)
             }
+        }
+    }
+
+    // MARK: - API Search
+
+    private func onSearchTextChanged() {
+        searchTask?.cancel()
+
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty, query.count >= 2 else {
+            apiResults = []
+            isSearchingAPI = false
+            return
+        }
+
+        isSearchingAPI = true
+
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(Constants.Defaults.searchDebounceMilliseconds + 200))
+            guard !Task.isCancelled else { return }
+
+            do {
+                // Use search index to find food IDs, then look up in local DB
+                let foodIds = try await MatvaretabellenService.shared.searchFoodIds(query: query, limit: 20)
+                guard !Task.isCancelled else { return }
+
+                let dbService = FoodDatabaseService(modelContext: modelContext)
+                let foods = try dbService.findByMatvaretabellenIds(foodIds)
+                guard !Task.isCancelled else { return }
+
+                // Filter out foods already shown in the text search results
+                let localIds = Set(filteredFoods.map(\.id))
+                self.apiResults = foods.filter { !localIds.contains($0.id) }
+            } catch {
+                self.apiResults = []
+            }
+            self.isSearchingAPI = false
         }
     }
 
@@ -107,8 +153,27 @@ struct AddFoodToMealSheet: View {
                 }
             }
 
-            if !searchText.isEmpty && filteredFoods.isEmpty {
-                ContentUnavailableView.search(text: searchText)
+            if !searchText.isEmpty {
+                if isSearchingAPI {
+                    Section("Matvaretabellen") {
+                        HStack {
+                            Spacer()
+                            ProgressView("Searching Matvaretabellen...")
+                                .font(.caption)
+                            Spacer()
+                        }
+                    }
+                } else if !apiResults.isEmpty {
+                    Section("Matvaretabellen (\(apiResults.count))") {
+                        ForEach(apiResults) { food in
+                            foodRow(food)
+                        }
+                    }
+                }
+
+                if filteredFoods.isEmpty && apiResults.isEmpty && !isSearchingAPI {
+                    ContentUnavailableView.search(text: searchText)
+                }
             }
         }
     }

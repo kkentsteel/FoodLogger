@@ -4,6 +4,7 @@ import SwiftData
 struct FoodsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = FoodsViewModel()
+    @State private var navigationPath = NavigationPath()
 
     @Query(sort: \FoodItem.name) private var allFoods: [FoodItem]
 
@@ -29,7 +30,7 @@ struct FoodsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 if isSearchActive {
                     searchResultsSection
@@ -43,6 +44,7 @@ struct FoodsView: View {
             }
             .onAppear {
                 viewModel.loadSections(context: modelContext)
+                viewModel.warmAPICache()
             }
             .navigationTitle("Foods")
             .navigationDestination(for: FoodItem.self) { food in
@@ -75,22 +77,51 @@ struct FoodsView: View {
 
     @ViewBuilder
     private var searchResultsSection: some View {
+        // Local text search results
         if viewModel.isSearching {
             HStack {
                 Spacer()
                 ProgressView("Searching...")
                 Spacer()
             }
-        } else if viewModel.searchResults.isEmpty {
-            ContentUnavailableView.search(text: viewModel.searchText)
-        } else {
-            Section("Results (\(viewModel.searchResults.count))") {
+        } else if !viewModel.searchResults.isEmpty {
+            Section("Your Foods (\(viewModel.searchResults.count))") {
                 ForEach(viewModel.searchResults) { food in
                     NavigationLink(value: food) {
                         FoodItemRow(food: food)
                     }
                 }
             }
+        }
+
+        // Matvaretabellen API results (CompactFood, not yet saved locally)
+        if viewModel.isSearchingAPI {
+            Section("Matvaretabellen") {
+                HStack {
+                    Spacer()
+                    ProgressView("Searching Matvaretabellen...")
+                        .font(.caption)
+                    Spacer()
+                }
+            }
+        } else if !viewModel.apiSearchResults.isEmpty {
+            Section("Matvaretabellen (\(viewModel.apiSearchResults.count))") {
+                ForEach(viewModel.apiSearchResults, id: \.id) { compactFood in
+                    Button {
+                        let imported = viewModel.importFood(compactFood, context: modelContext)
+                        navigationPath.append(imported)
+                    } label: {
+                        CompactFoodRow(food: compactFood)
+                    }
+                    .tint(.primary)
+                }
+            }
+        }
+
+        // No results at all
+        if !viewModel.isSearching && !viewModel.isSearchingAPI
+            && viewModel.searchResults.isEmpty && viewModel.apiSearchResults.isEmpty {
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 

@@ -65,6 +65,23 @@ final class FoodDatabaseService {
         return try modelContext.fetch(descriptor).first
     }
 
+    /// Look up multiple foods by their Matvaretabellen IDs, preserving the order of the input IDs
+    func findByMatvaretabellenIds(_ ids: [String]) throws -> [FoodItem] {
+        let predicate = #Predicate<FoodItem> { item in
+            item.matvaretabellenId != nil
+        }
+        let descriptor = FetchDescriptor<FoodItem>(predicate: predicate)
+        let allMatvare = try modelContext.fetch(descriptor)
+
+        let idSet = Set(ids)
+        let lookup = Dictionary(grouping: allMatvare.filter { idSet.contains($0.matvaretabellenId ?? "") }) {
+            $0.matvaretabellenId ?? ""
+        }
+
+        // Preserve ranking order from search
+        return ids.compactMap { lookup[$0]?.first }
+    }
+
     func totalFoodCount() throws -> Int {
         let descriptor = FetchDescriptor<FoodItem>()
         return try modelContext.fetchCount(descriptor)
